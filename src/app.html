@@ -146,6 +146,21 @@ textarea.json { width: 100%; min-height: 120px; font: 12px/1.4 ui-monospace, Men
 .nota textarea:focus { border-color: var(--accent); outline: none; }
 .json-box summary { cursor: pointer; padding: 4px 0; }
 .json-box[open] { display: grid; gap: 8px; }
+/* Vídeos */
+.btn-video { display: inline-flex; align-items: center; gap: 6px; background: var(--accent-soft); color: var(--accent); border: 0; border-radius: 999px; padding: 6px 14px; font-weight: 600; font-size: 13.5px; min-height: 36px; justify-self: start; }
+.video-box { display: grid; gap: 10px; }
+.player { position: relative; width: 100%; aspect-ratio: 16 / 9; max-width: 100%; border-radius: 8px; overflow: hidden; background: #000; }
+.player iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.video-info { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; font-size: 13.5px; }
+.min0 { min-width: 0; }
+.link-yt { color: var(--muted); font-size: 13px; text-underline-offset: 3px; }
+.linha-video { display: grid; gap: 6px; border-top: 1px solid var(--line); padding-top: 10px; font-size: 14px; }
+.linha-video .status { color: var(--ink); font-size: 13px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.linha-video summary { cursor: pointer; }
+.campo-url { height: 40px; font-size: 14px; flex: 1 1 200px; }
+.campo-texto { width: 100%; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); padding: 10px 12px; font: 14px/1.5 ui-monospace, Menlo, monospace; resize: vertical; }
+.campo-texto:focus { border-color: var(--accent); outline: none; }
+
 /* Admin */
 .link-admin { background: none; border: 0; color: var(--muted); font-size: 13px; text-decoration: underline; text-underline-offset: 3px; justify-self: start; padding: 4px 0; min-height: 32px; }
 .chip.alerta { background: var(--warn); color: var(--surface); }
@@ -407,6 +422,7 @@ const ICON = {
   back: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M15 6l-6 6 6 6"/></svg>',
   upload: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg>',
   swap: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4L3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"/></svg>',
+  play: '<svg class="icon" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg>',
   nota: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4"/></svg>',
 };
 
@@ -487,7 +503,7 @@ function renderLogin() {
 }
 
 function render() {
-  if (modoAdmin) return !admAuth ? renderAdminLogin() : view.tela === 'admin-usuario' ? renderAdminUsuario() : renderAdmin();
+  if (modoAdmin) return !admAuth ? renderAdminLogin() : view.tela === 'admin-usuario' ? renderAdminUsuario() : view.tela === 'admin-videos' ? renderAdminVideos() : renderAdmin();
   if (!auth) return renderLogin();
   if (!carregado && !plano) {
     $dock.hidden = true;
@@ -596,6 +612,7 @@ function exCard(ex) {
     <h3>${esc(ex.nome)}</h3>
     <div class="prescricao"><span><b>Séries:</b> ${esc(ex.series)}</span><span><b>Carga:</b> ${esc(ex.carga)}</span></div>
     ${ex.instrucoes ? `<div class="instr">${esc(ex.instrucoes)}</div>` : ''}
+    <div class="video" id="video-${ex.id}">${videoBloco(ex)}</div>
     <div class="sets">${ex.sets.map((_, i) => setRow(ex, i)).join('')}</div>
     <details class="nota" ${nota ? 'open' : ''}>
       <summary>${ICON.nota} ${nota ? 'Minha anotação' : 'Anotação'}</summary>
@@ -715,6 +732,61 @@ function renderHistorico() {
     }).join('') : '<section class="painel"><p>Quando você finalizar um treino, ele aparece aqui com as cargas de cada série.</p></section>'}`;
 }
 
+// ---------- vídeos dos exercícios ----------
+// O servidor busca nos canais escolhidos pelo admin e guarda; aqui guardamos por 1 dia para abrir rápido.
+let videoCache = store.get('videos', {});      // nome normalizado -> { videos, fixo, em }
+const videoAberto = {};                          // ex.id -> índice do vídeo mostrado
+const videoEstado = {};                          // ex.id -> 'carregando' | mensagem de erro
+const buscaYoutube = (nome) => `https://www.youtube.com/results?search_query=${encodeURIComponent(nome + ' execução')}`;
+
+function videoBloco(ex) {
+  if (!(ex.id in videoAberto)) return `<button class="btn-video" data-a="video" data-ex="${ex.id}">${ICON.play} Ver execução</button>`;
+  const c = videoCache[norm(ex.nome)];
+  const est = videoEstado[ex.id];
+  let corpo;
+  if (est === 'carregando') corpo = '<p class="muted">Procurando o vídeo…</p>';
+  else if (est) corpo = `<p class="msg-erro">${esc(est)}</p>`;
+  else if (!c) corpo = '';
+  else if (!c.videos.length) corpo = '<p class="muted">Não achei um vídeo desse exercício. Tente "Procurar no YouTube".</p>';
+  else {
+    const i = videoAberto[ex.id] % c.videos.length, v = c.videos[i];
+    corpo = `<div class="player"><iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(v.id)}?rel=0&playsinline=1" title="${esc(v.titulo)}"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>
+      <div class="video-info"><span class="min0"><b>${esc(v.titulo)}</b><br><span class="muted">${esc(v.canal)}${c.fixo && i === 0 ? ' · escolhido pelo admin' : ''}</span></span>
+        ${c.videos.length > 1 ? `<button class="btn small" data-a="video-outro" data-ex="${ex.id}">Outro vídeo (${i + 1}/${c.videos.length})</button>` : ''}</div>`;
+  }
+  return `<div class="video-box">${corpo}
+    <div class="row"><button class="btn small ghost" data-a="video-fechar" data-ex="${ex.id}">Fechar vídeo</button>
+    <a class="link-yt" href="${buscaYoutube(ex.nome)}" target="_blank" rel="noopener">Procurar no YouTube</a></div></div>`;
+}
+function exPorId(id) { for (const t of plano?.treinos || []) for (const e of t.exercicios) if (e.id === id) return e; return null; }
+function atualizarVideo(exId) {
+  const el = document.getElementById(`video-${exId}`), ex = exPorId(exId);
+  if (el && ex) el.innerHTML = videoBloco(ex);
+}
+async function abrirVideo(exId) {
+  const ex = exPorId(exId);
+  if (!ex) return;
+  videoAberto[exId] = 0;
+  const k = norm(ex.nome), c = videoCache[k];
+  const velho = !c || !c.videos.length || Date.now() - (c.em || 0) > 86400000;
+  if (!velho) return atualizarVideo(exId);
+  videoEstado[exId] = c ? null : 'carregando';
+  atualizarVideo(exId);
+  try {
+    const r = await api(`video?nome=${encodeURIComponent(ex.nome)}`);
+    if (r.status !== 200) throw new Error(r.mensagem || 'Não consegui buscar o vídeo agora.');
+    videoCache[k] = { videos: r.videos, fixo: r.fixo, em: Date.now() };
+    // só guarda no aparelho quando achou vídeo; "nada encontrado" é perguntado de novo da próxima vez
+    if (r.videos.length) store.set('videos', Object.fromEntries(Object.entries(videoCache).filter(([, v]) => v.videos.length)));
+    videoEstado[exId] = null;
+  } catch (e) {
+    if (e.message === 'sessao') return;
+    videoEstado[exId] = c ? null : (e.message === 'Failed to fetch' ? 'Sem conexão para buscar o vídeo.' : e.message);
+  }
+  atualizarVideo(exId);
+}
+
 // ---------- admin ----------
 // Login próprio ("admin" + senha), guardado à parte: não mexe na conta de treino nem trava o aparelho.
 const ADM_AUTH = 'ficha:admin-auth';
@@ -832,6 +904,7 @@ function renderAdmin() {
   const l = adm.lista;
   $app.innerHTML = `
     <div class="spread"><button class="voltar" data-a="sair-modo-admin">${ICON.back} App</button><div class="row"><button class="btn small ghost" data-a="adm-atualizar">Atualizar</button><button class="btn small" data-a="adm-sair">Sair do admin</button></div></div>
+    <div class="row"><button class="btn small" data-a="adm-videos">${ICON.play} Vídeos dos exercícios</button></div>
     <header class="plano"><div class="eyebrow">Admin</div><h1>Usuários</h1>
       ${l ? `<div class="meta"><span>${l.length} ${l.length === 1 ? 'pessoa' : 'pessoas'}</span><span>${plural(l.reduce((a, u) => a + u.treinos, 0), 'treino registrado', 'treinos registrados')}</span></div>` : ''}
     </header>
@@ -924,6 +997,70 @@ async function admEnviarFicha(slug, ficha, origemTxt) {
   admCarregarUsuario(slug);
 }
 
+
+// ---------- admin: vídeos ----------
+let admVid = { dados: null, base: null, erro: '', salvando: false };
+async function admCarregarVideos() {
+  admVid.erro = '';
+  render();
+  try {
+    const [r, base] = await Promise.all([
+      api('admin/videos', { admin: true }),
+      fetch('treino.json', { cache: 'no-store' }).then((x) => (x.ok ? x.json() : null)).catch(() => null),
+    ]);
+    if (r.status !== 200) throw new Error(r.mensagem || 'Não consegui carregar os vídeos.');
+    admVid.dados = r; admVid.base = base;
+  } catch (e) { if (e.message !== 'sessao') admVid.erro = e.message; }
+  if (view.tela === 'admin-videos') render();
+}
+
+function renderAdminVideos() {
+  $dock.hidden = true;
+  const d = admVid.dados;
+  const voltar = `<div class="spread"><button class="voltar" data-a="admin">${ICON.back} Usuários</button></div>`;
+  if (!d) { $app.innerHTML = voltar + (admVid.erro ? `<section class="painel erro"><p>${esc(admVid.erro)}</p></section>` : '<p class="muted">Carregando…</p>'); return; }
+  const porNome = new Map(d.videos.map((v) => [norm(v.nome), v]));
+  // exercícios da ficha base + qualquer outro que já foi buscado
+  const nomes = [];
+  for (const t of admVid.base?.treinos || []) for (const e of t.exercicios) if (!nomes.some((n) => norm(n) === norm(e.nome))) nomes.push(e.nome);
+  for (const v of d.videos) if (!nomes.some((n) => norm(n) === norm(v.nome))) nomes.push(v.nome);
+  const linha = (nome, i) => {
+    const v = porNome.get(norm(nome));
+    const status = !v ? '<span class="muted">Ainda não buscado</span>'
+      : v.fixo ? `<span class="chip ok">Fixado</span> ${esc(v.fixo.titulo)}`
+      : v.videos?.length ? `<span class="muted">Achado:</span> ${esc(v.videos[0].titulo)}`
+      : '<span class="chip alerta">Nada encontrado</span>';
+    return `<div class="linha-video">
+      <div class="min0"><b>${esc(nome)}</b><div class="status">${status}</div></div>
+      <details><summary class="eyebrow">Trocar</summary>
+        <form class="row form-fixar" data-nome="${esc(nome)}" novalidate>
+          <input class="campo campo-url" id="url-video-${i}" placeholder="Link do vídeo no YouTube" inputmode="url" value="${esc(v?.fixo ? 'https://youtu.be/' + v.fixo.id : '')}">
+          <button class="btn small" type="submit">Fixar</button>
+          ${v?.fixo ? `<button class="btn small ghost" type="button" data-a="adm-desfixar" data-nome="${esc(nome)}">Desfixar</button>` : ''}
+          ${v && !v.fixo ? `<button class="btn small ghost" type="button" data-a="adm-rebuscar" data-nome="${esc(nome)}">Buscar de novo</button>` : ''}
+        </form>
+      </details>
+    </div>`;
+  };
+  $app.innerHTML = `${voltar}
+    <header class="plano"><div class="eyebrow">Admin</div><h1>Vídeos</h1></header>
+    ${admVid.erro ? `<section class="painel erro"><p>${esc(admVid.erro)}</p></section>` : ''}
+    ${!d.temChave ? '<section class="painel erro"><p>A chave do YouTube não está cadastrada (secret YOUTUBE_API_KEY).</p></section>' : ''}
+    <form class="painel" id="form-canais" novalidate>
+      <div class="eyebrow">Canais do YouTube (opcional)</div>
+      <p>Vazio: a busca é feita no YouTube todo, em português. Se quiser limitar a alguns canais, coloque um por linha (o @ ou o link do canal).</p>
+      <textarea class="campo-texto" id="canais" rows="4" placeholder="@canal&#10;https://www.youtube.com/@outrocanal">${esc(d.canais.map((c) => c.handle || c.id).join('\n'))}</textarea>
+      <p class="muted">${d.canais.length ? `Buscando só em: ${d.canais.map((c) => esc(c.nome)).join(' · ')}` : 'Buscando no YouTube todo.'}</p>
+      <div class="row"><button class="btn small primary" type="submit" ${admVid.salvando ? 'disabled' : ''}>${admVid.salvando ? 'Salvando…' : 'Salvar canais'}</button></div>
+      <p class="muted">Trocar os canais apaga as buscas já feitas (os vídeos fixados ficam).</p>
+    </form>
+    <section class="painel">
+      <div class="eyebrow">Exercícios</div>
+      <p class="muted">Cada exercício é buscado na primeira vez que alguém toca em "Ver execução". Se o vídeo achado não for o certo, cole o link do certo e toque em Fixar.</p>
+      ${nomes.map(linha).join('')}
+    </section>`;
+}
+
 // ---------- ações ----------
 function finalizar() {
   const t = treino(sessao.treinoId);
@@ -970,6 +1107,21 @@ $app.addEventListener('click', async (ev) => {
   else if (a === 'desvincular') {
     if (!b.dataset.sure) { b.dataset.sure = '1'; b.textContent = 'Toque de novo para liberar'; return; }
     store.del('dono'); store.del(CACHE()); dono = null; sair();
+  }
+  else if (a === 'video') abrirVideo(b.dataset.ex);
+  else if (a === 'video-fechar') { delete videoAberto[b.dataset.ex]; videoEstado[b.dataset.ex] = null; atualizarVideo(b.dataset.ex); }
+  else if (a === 'video-outro') { videoAberto[b.dataset.ex]++; atualizarVideo(b.dataset.ex); }
+  else if (a === 'adm-videos') { view = { tela: 'admin-videos' }; window.scrollTo({ top: 0 }); admCarregarVideos(); }
+  else if (a === 'adm-desfixar' || a === 'adm-rebuscar') {
+    const nome = b.dataset.nome;
+    try {
+      const r = a === 'adm-desfixar'
+        ? await api('admin/video', { method: 'PUT', body: JSON.stringify({ nome, url: '' }), admin: true })
+        : await api(`admin/video?nome=${encodeURIComponent(nome)}`, { method: 'DELETE', admin: true });
+      if (r.status !== 200) throw new Error(r.mensagem || 'Não deu certo.');
+      toast(a === 'adm-desfixar' ? 'Vídeo desfixado' : 'Será buscado de novo na próxima vez');
+      admCarregarVideos();
+    } catch (e) { if (e.message !== 'sessao') toast(e.message); }
   }
   else if (a === 'modo-admin') entrarModoAdmin();
   else if (a === 'sair-modo-admin') sairModoAdmin();
@@ -1046,6 +1198,27 @@ $app.addEventListener('click', async (ev) => {
 
 $app.addEventListener('submit', (ev) => {
   ev.preventDefault();
+  if (ev.target.id === 'form-canais') {
+    const entradas = document.getElementById('canais').value.split('\n').map((x) => x.trim()).filter(Boolean);
+    admVid.salvando = true; render();
+    api('admin/canais', { method: 'PUT', body: JSON.stringify({ entradas }), admin: true })
+      .then((r) => {
+        admVid.salvando = false;
+        if (r.status !== 200) { admVid.erro = r.mensagem || 'Não consegui salvar os canais.'; return render(); }
+        toast(r.canais.length ? `${r.canais.length} ${r.canais.length === 1 ? 'canal salvo' : 'canais salvos'}` : 'Buscando no YouTube todo');
+        admCarregarVideos();
+      })
+      .catch((e) => { admVid.salvando = false; if (e.message !== 'sessao') { admVid.erro = 'Sem conexão.'; render(); } });
+    return;
+  }
+  if (ev.target.classList.contains('form-fixar')) {
+    const url = ev.target.querySelector('input').value.trim();
+    if (!url) { toast('Cole o link do vídeo.'); return; }
+    api('admin/video', { method: 'PUT', body: JSON.stringify({ nome: ev.target.dataset.nome, url }), admin: true })
+      .then((r) => { if (r.status !== 200) return toast(r.mensagem || 'Não deu certo.'); toast('Vídeo fixado'); admCarregarVideos(); })
+      .catch((e) => { if (e.message !== 'sessao') toast('Sem conexão.'); });
+    return;
+  }
   if (ev.target.id === 'form-admin') {
     const senha = document.getElementById('adm-senha').value;
     if (!senha) { admLogin.erro = 'Digite a senha.'; return render(); }
