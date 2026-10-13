@@ -1243,9 +1243,9 @@ function renderAdminVideos() {
     ${!d.temChave ? '<section class="painel erro"><p>A chave do YouTube não está cadastrada (secret YOUTUBE_API_KEY).</p></section>' : ''}
     <form class="painel" id="form-canais" novalidate>
       <div class="eyebrow">Canais do YouTube (opcional)</div>
-      <p>Vazio: a busca é feita no YouTube todo, em português. Se quiser limitar a alguns canais, coloque um por linha (o @ ou o link do canal).</p>
+      <p>Um por linha (o @ ou o link do canal). A busca começa por eles, nessa ordem; o que não tiver vídeo neles é buscado no YouTube todo. Vazio: busca direto no YouTube todo.</p>
       <textarea class="campo-texto" id="canais" rows="4" placeholder="@canal&#10;https://www.youtube.com/@outrocanal">${esc(d.canais.map((c) => c.handle || c.id).join('\n'))}</textarea>
-      <p class="muted">${d.canais.length ? `Buscando só em: ${d.canais.map((c) => esc(c.nome)).join(' · ')}` : 'Buscando no YouTube todo.'}</p>
+      <p class="muted">${d.canais.length ? `Buscando primeiro em: ${d.canais.map((c) => esc(c.nome)).join(' · ')}` : 'Buscando no YouTube todo.'}</p>
       <div class="row"><button class="btn small primary" type="submit" ${admVid.salvando ? 'disabled' : ''}>${admVid.salvando ? 'Salvando…' : 'Salvar canais'}</button></div>
       <p class="muted">Trocar os canais apaga as buscas já feitas (os vídeos fixados ficam).</p>
     </form>

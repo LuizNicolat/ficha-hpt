@@ -328,23 +328,25 @@ function nota(nome, titulo) {
   return n / a.size;
 }
 
-// Sem canais definidos: busca no YouTube inteiro (vídeos em português que podem ser embutidos).
-// Com canais: busca só neles, na ordem, e para no primeiro que tiver um vídeo com o nome do exercício.
+// Primeiro nos canais escolhidos no Admin (na ordem), que têm prioridade; se nenhum deles tiver um vídeo
+// com o nome do exercício, completa com o YouTube todo (vídeos em português que podem ser embutidos).
 async function buscarVideos(env, canais, nome) {
   const limpo = nome.replace(/[()]/g, ' ').replace(/\s+/g, ' ').trim();
   const achados = [];
   const comum = { part: 'snippet', type: 'video', relevanceLanguage: 'pt', videoEmbeddable: 'true', safeSearch: 'strict' };
-  for (const c of canais.length ? canais : [null]) {
-    const params = c ? { ...comum, channelId: c.id, q: limpo, maxResults: '3' }
-      : { ...comum, q: `${limpo} execução`, maxResults: '6', regionCode: 'BR' };
-    const j = await yt(env, 'search', params);
-    (j.items || []).forEach((it, pos) => {
-      if (!it.id?.videoId) return;
-      const titulo = desfazHtml(it.snippet.title);
-      achados.push({ id: it.id.videoId, titulo, canal: desfazHtml(it.snippet.channelTitle), nota: nota(nome, titulo) - pos * 0.01 });
-    });
-    if (c && achados.some((v) => v.nota >= 0.6)) break;   // achou um bom: não gasta busca nos outros canais
+  const juntar = (j, bonus) => (j.items || []).forEach((it, pos) => {
+    if (!it.id?.videoId) return;
+    const titulo = desfazHtml(it.snippet.title);
+    achados.push({ id: it.id.videoId, titulo, canal: desfazHtml(it.snippet.channelTitle), nota: nota(nome, titulo) + bonus - pos * 0.01 });
+  });
+  const bom = () => achados.some((v) => v.nota >= 0.6);
+
+  for (const c of canais) {
+    juntar(await yt(env, 'search', { ...comum, channelId: c.id, q: limpo, maxResults: '3' }), 0.15);
+    if (bom()) break;   // achou um bom: não gasta busca nos outros canais
   }
+  if (!bom()) juntar(await yt(env, 'search', { ...comum, q: `${limpo} execução`, maxResults: '6', regionCode: 'BR' }), 0);
+
   const vistos = new Set();
   return achados.sort((a, b) => b.nota - a.nota).filter((v) => !vistos.has(v.id) && vistos.add(v.id)).slice(0, 3)
     .map(({ id, titulo, canal }) => ({ id, titulo, canal }));
