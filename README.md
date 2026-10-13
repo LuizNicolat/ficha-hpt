@@ -19,20 +19,19 @@ parser.js                  parser do PDF (usado pelo app e pelo script)
 src/app.html               tela do app (HTML + CSS + JS)
 build.mjs                  junta tudo em docs/index.html
 gerar-json.mjs             PDF -> docs/treino.json (ficha base)
-functions/api/[[rota]].js  API (Cloudflare Pages Functions): entrar, dados, sair
+worker.js                  Cloudflare Worker: serve docs/ e a API (/api/entrar, /api/dados, /api/sair)
+wrangler.jsonc             configuração do Worker (pasta do site e ID do KV)
 docs/                      o site publicado
 .github/workflows/         opcional: gera o treino.json sozinho ao subir treino.pdf
 ```
 
-## Publicando (Cloudflare Pages + KV)
+## Publicando (Cloudflare Workers + KV)
 
-1. Pages conectado ao repo, com **Build command** vazio e **Build output directory** `docs`.
-2. Workers & Pages → **KV** → **Create namespace** com o nome `ficha-hpt`.
-3. No projeto do Pages → **Settings** → **Bindings** (ou *Functions → KV namespace bindings*) → **Add** → KV namespace:
-   - Variable name: `FICHA_KV`
-   - Namespace: `ficha-hpt`
-   - Ambiente **Production** (e Preview, se quiser testar branches)
-4. Refaça o deploy (Deployments → último deploy → *Retry deployment*) para o binding valer.
+O projeto no Cloudflare é um Worker conectado a este repo: cada push na `main` publica sozinho, usando o `wrangler.jsonc`.
+
+1. Crie um KV: Storage & Databases → KV → Create namespace (`ficha-hpt`).
+2. Copie o ID do namespace e coloque em `wrangler.jsonc`, no campo `id` de `FICHA_KV`.
+3. Commit + push.
 
 ## Rodando local
 
@@ -40,7 +39,7 @@ docs/                      o site publicado
 npm install
 npm run build                                   # gera docs/index.html
 npm run gerar                                   # treino.pdf -> docs/treino.json
-npx wrangler pages dev docs --kv FICHA_KV       # site + API em http://localhost:8788
+npx wrangler dev                                # site + API em http://localhost:8787
 ```
 
 Para atualizar a ficha base: rode `npm run gerar` com o PDF novo e commite o `docs/treino.json`. Não commite o PDF (tem nome e fotos).

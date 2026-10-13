@@ -1,4 +1,4 @@
-// API da Ficha Hpt — Cloudflare Pages Functions + KV (binding: FICHA_KV)
+// Ficha Hpt — Cloudflare Worker: serve o site (pasta docs/) e a API em /api/* com KV (binding FICHA_KV)
 //
 // POST /api/entrar   { nome, pin, lembrar, criar }  -> { token, nome, slug, rev, dados }
 // GET  /api/dados                                     -> { rev, dados }
@@ -84,11 +84,18 @@ async function entrar(request, kv) {
   return json({ token, nome: usuario.nome, slug, rev: registro.rev, dados: registro.dados });
 }
 
-export async function onRequest({ request, env, params }) {
+export default {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+    if (url.pathname.startsWith('/api/')) return api(request, env, url.pathname.slice(5).replace(/\/+$/, ''));
+    return env.ASSETS.fetch(request);   // arquivos de docs/
+  },
+};
+
+async function api(request, env, rota) {
   const kv = env.FICHA_KV;
   if (!kv) return json({ erro: 'config', mensagem: 'O armazenamento FICHA_KV não está ligado ao projeto no Cloudflare.' }, 500);
 
-  const rota = (params.rota || []).join('/');
   const metodo = request.method;
 
   if (rota === 'entrar' && metodo === 'POST') return entrar(request, kv);

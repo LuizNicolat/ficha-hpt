@@ -1,0 +1,18 @@
+// Configuração do Worker no Cloudflare (lida pelo deploy automático a cada push na main).
+{
+  "name": "ficha-hpt",
+  "main": "worker.js",
+  "compatibility_date": "2025-02-24",
+  // O site: tudo que está em docs/ é servido direto; /api/* cai no worker.js
+  "assets": {
+    "directory": "./docs",
+    "binding": "ASSETS"
+  },
+  // Onde ficam os dados de cada usuário
+  "kv_namespaces": [
+    {
+      "binding": "FICHA_KV",
+      "id": "COLE_AQUI_O_ID_DO_KV"
+    }
+  ]
+}
