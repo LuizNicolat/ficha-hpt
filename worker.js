@@ -7,7 +7,9 @@
 //
 // Admin: login próprio (usuário "admin" + senha do secret ADMIN_SENHA no Cloudflare):
 // POST   /api/admin/entrar                   { senha, lembrar } -> { token }
-// GET    /api/admin/usuarios                 lista com resumo
+// GET    /api/admin/usuarios                 lista com resumo (+ cadastroAberto)
+// POST   /api/admin/usuarios     { nome, pin, ficha }  cria um usuário
+// PUT    /api/admin/config       { cadastroAberto }    liga/desliga o cadastro pela tela de login
 // GET    /api/admin/usuarios/<slug>          dados completos
 // POST   /api/admin/usuarios/<slug>/pin      { pin }  novo PIN (desconecta os aparelhos)
 // POST   /api/admin/usuarios/<slug>/desbloquear
@@ -28,6 +30,7 @@
 //   s:<token>  <slug>                                  sessão (expira)
 //   t:<slug>   <n>                                     tentativas de PIN erradas (expira em 15 min)
 //   cfg:canais [{ id, nome, handle }]                  canais do YouTube usados na busca
+//   cfg:cadastro  "fechado"                         só o admin cria contas (sem a chave: aberto)
 //   v:<nome>   { nome, videos, fixo, buscadoEm }       vídeos de cada exercício
 
 const MAX_TENTATIVAS = 5;
@@ -103,6 +106,8 @@ async function entrar(request, kv, env) {
 
   let usuario = await kv.get(`u:${slug}`, 'json');
   if (!usuario) {
+    if ((await kv.get('cfg:cadastro')) === 'fechado')
+      return json({ erro: 'sem-cadastro', mensagem: `Não encontrei "${nome}". Peça ao admin para criar sua conta.` }, 404);
     if (!corpo.criar) return json({ erro: 'nao-existe', mensagem: `Ninguém se chama "${nome}" por aqui ainda.` }, 404);
     const salt = aleatorio(16);
     usuario = { nome, salt, hash: await hashPin(pin, salt), criadoEm: new Date().toISOString() };
@@ -231,7 +236,30 @@ async function admin(request, kv, rota, eu) {
       const [u, d, t] = await Promise.all([kv.get(name, 'json'), kv.get(`d:${slug}`, 'json'), kv.get(`t:${slug}`)]);
       return u ? { ...resumo(slug, u, d, Number(t) || 0, sessoes[slug] || 0), admin: slug === eu } : null;
     }));
-    return json({ usuarios: lista.filter(Boolean).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')) });
+    return json({ usuarios: lista.filter(Boolean).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')), cadastroAberto: (await kv.get('cfg:cadastro')) !== 'fechado' });
+  }
+
+  if (rota === 'usuarios' && metodo === 'POST') {
+    const corpo = await lerCorpo(request);
+    const nome = String(corpo?.nome || '').trim().replace(/\s+/g, ' ').slice(0, 30);
+    const pin = String(corpo?.pin || '');
+    const slug = slugify(nome);
+    if (!slug) return json({ erro: 'nome', mensagem: 'Digite o nome da pessoa.' }, 400);
+    if (slug === 'admin') return json({ erro: 'nome', mensagem: 'Esse nome é reservado.' }, 400);
+    if (!/^\d{4}$/.test(pin)) return json({ erro: 'pin', mensagem: 'O PIN tem 4 números.' }, 400);
+    if (await kv.get(`u:${slug}`)) return json({ erro: 'existe', mensagem: `Já existe um usuário "${nome}".` }, 409);
+    const salt = aleatorio(16);
+    const agora = new Date().toISOString();
+    await kv.put(`u:${slug}`, JSON.stringify({ nome, salt, hash: await hashPin(pin, salt), criadoEm: agora, criadoPor: 'admin' }));
+    const ficha = corpo?.ficha?.treinos?.length ? corpo.ficha : null;
+    await kv.put(`d:${slug}`, JSON.stringify({ rev: ficha ? 1 : 0, dados: ficha ? { ficha, fichaEm: Date.now() } : null, atualizadoEm: agora }));
+    return json({ ok: true, slug, nome });
+  }
+
+  if (rota === 'config' && metodo === 'PUT') {
+    const corpo = await lerCorpo(request);
+    if (corpo?.cadastroAberto) await kv.delete('cfg:cadastro'); else await kv.put('cfg:cadastro', 'fechado');
+    return json({ ok: true, cadastroAberto: !!corpo?.cadastroAberto });
   }
 
   const m = rota.match(/^usuarios\/([a-z0-9-]+)(?:\/(pin|desbloquear|desconectar|ficha))?$/);
