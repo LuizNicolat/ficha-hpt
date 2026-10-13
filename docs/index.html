@@ -80,8 +80,6 @@ h2 { font-size: 22px; }
 .treino-card .nome { font-family: var(--font-display); font-size: 21px; font-weight: 600; }
 .treino-card .resumo { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .treino-card .info { min-width: 0; display: grid; gap: 2px; }
-.treino-card.perfil { grid-template-columns: 44px 1fr auto; }
-.treino-card.perfil .letra { width: 44px; height: 44px; font-size: 22px; border-width: 2px; }
 .campo { width: 100%; height: 48px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); padding: 0 12px; font-size: 17px; }
 .campo:focus { border-color: var(--accent); outline: none; }
 .chip { display: inline-block; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; padding: 3px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); white-space: nowrap; }
@@ -142,6 +140,23 @@ h2 { font-size: 22px; }
 
 .toast { position: fixed; left: 50%; bottom: calc(96px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-weight: 600; font-size: 14px; z-index: 20; max-width: calc(100% - 32px); }
 textarea.json { width: 100%; min-height: 120px; font: 12px/1.4 ui-monospace, Menlo, monospace; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
+/* Login, sincronização e anotações */
+.lembrar { display: flex; align-items: center; gap: 10px; font-size: 14.5px; min-height: 40px; cursor: pointer; }
+.lembrar input { width: 20px; height: 20px; accent-color: var(--accent); }
+.campo.pin { letter-spacing: .5em; font-variant-numeric: tabular-nums; max-width: 180px; }
+.msg-erro { color: var(--warn); font-weight: 600; }
+.sync { font-size: 12px; font-weight: 600; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.sync::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--done); }
+.sync.salvando::before { background: var(--accent); }
+.sync.offline { color: var(--warn); }
+.sync.offline::before { background: var(--warn); }
+.nota summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13.5px; font-weight: 600; min-height: 32px; }
+.nota summary::-webkit-details-marker { display: none; }
+.nota[open] summary { color: var(--accent); }
+.nota textarea { width: 100%; margin-top: 6px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); padding: 8px 10px; font-size: 15px; resize: vertical; }
+.nota textarea:focus { border-color: var(--accent); outline: none; }
+.json-box summary { cursor: pointer; padding: 4px 0; }
+.json-box[open] { display: grid; gap: 8px; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 
@@ -339,7 +354,7 @@ async function parseMfitPdf(pdfjs, bytes) {
 }
 
 
-// ---------- armazenamento local ----------
+// ---------- armazenamento no aparelho ----------
 const PFX = 'ficha:';
 const store = {
   get(k, d) { try { const v = localStorage.getItem(PFX + k); return v ? JSON.parse(v) : d; } catch { return d; } },
@@ -347,57 +362,204 @@ const store = {
   del(k) { try { localStorage.removeItem(PFX + k); } catch {} },
 };
 
-// A ficha é a mesma para todos; histórico, cargas, treino em andamento e descanso são de cada perfil.
-let plano = store.get('plano', null);
-let perfis = store.get('perfis', []);       // [{ id, nome }]
-let perfilId = store.get('perfilAtual', null);
-const perfil = () => perfis.find((p) => p.id === perfilId);
-const pk = (k) => `p:${perfilId}:${k}`;
-
-let historico = [];
-let ultimas = {};   // cargas usadas por exercício e série
-let sessao = null;  // treino em andamento
-let descansoSeg = 90;
-function carregarPerfil() {
-  historico = store.get(pk('historico'), []);
-  ultimas = store.get(pk('ultimas'), {});
-  sessao = store.get(pk('sessao'), null);
-  descansoSeg = store.get(pk('descanso'), 90);
+// ---------- login ----------
+// auth: { token, nome, slug } — no localStorage com "lembrar de mim", senão só nesta aba.
+const AUTH = 'ficha:auth';
+function lerAuth() {
+  try { return JSON.parse(localStorage.getItem(AUTH) || sessionStorage.getItem(AUTH) || 'null'); } catch { return null; }
 }
-if (!perfil()) perfilId = null; else carregarPerfil();
+function gravarAuth(a, lembrar) {
+  try { localStorage.removeItem(AUTH); sessionStorage.removeItem(AUTH); } catch {}
+  if (!a) return;
+  try { (lembrar ? localStorage : sessionStorage).setItem(AUTH, JSON.stringify(a)); } catch {}
+}
+let auth = lerAuth();
+let dono = store.get('dono', null);   // { slug, nome }: o aparelho fica preso ao primeiro usuário
+let login = { etapa: 'form', erro: '', nome: '', carregando: false };
 
-function entrar(nome) {
-  nome = nome.trim().replace(/\s+/g, ' ').slice(0, 30);
-  if (!nome) return;
-  let p = perfis.find((x) => x.nome.toLowerCase() === nome.toLowerCase());
-  if (!p) {
-    p = { id: Date.now().toString(36), nome };
-    // Dados da versão sem perfis passam para o primeiro perfil criado.
-    if (!perfis.length) {
-      for (const k of ['historico', 'ultimas', 'sessao', 'descanso']) {
-        const antigo = store.get(k, null);
-        if (antigo !== null) { store.set(`p:${p.id}:${k}`, antigo); store.del(k); }
-      }
+// ---------- dados do usuário (o "JSON" de cada um) ----------
+// ficha: cópia da ficha base, que a pessoa pode trocar pelo PDF dela
+let plano = null, fichaEm = 0;
+let historico = [];
+let ultimas = {};     // cargas usadas, por exercício e série
+let notas = {};       // anotações por exercício
+let sessao = null, sessaoEm = 0;   // treino em andamento
+let descansoSeg = 90;
+let repoIgnorado = null;
+
+let rev = 0, sujo = false, sync = 'ok';   // ok | salvando | offline
+let carregado = false;
+const CACHE = () => `cache:${auth.slug}`;
+
+function coletar() {
+  return { ficha: plano, fichaEm, historico, ultimas, notas, sessao, sessaoEm, descanso: descansoSeg, repoIgnorado };
+}
+function aplicar(d) {
+  d = d || {};
+  plano = d.ficha || null; fichaEm = d.fichaEm || 0;
+  historico = d.historico || []; ultimas = d.ultimas || {}; notas = d.notas || {};
+  sessao = d.sessao || null; sessaoEm = d.sessaoEm || 0;
+  descansoSeg = d.descanso || 90; repoIgnorado = d.repoIgnorado || null;
+}
+function guardarCache() { store.set(CACHE(), { rev, sujo, dados: coletar() }); }
+
+// Junta o que está no servidor com o que mudou neste aparelho (ex.: treinou offline no celular
+// enquanto o PC tinha uma versão antiga). Histórico soma os dois; o resto fica com o mais novo.
+function mesclar(s, l) {
+  if (!s) return l;
+  const hist = new Map();
+  for (const h of [...(s.historico || []), ...(l.historico || [])]) hist.set(h.id || h.fim, h);
+  return {
+    ficha: (l.fichaEm || 0) >= (s.fichaEm || 0) ? l.ficha : s.ficha,
+    fichaEm: Math.max(l.fichaEm || 0, s.fichaEm || 0),
+    historico: [...hist.values()].sort((a, b) => b.fim.localeCompare(a.fim)),
+    ultimas: { ...s.ultimas, ...l.ultimas },
+    notas: { ...s.notas, ...l.notas },
+    sessao: (l.sessaoEm || 0) >= (s.sessaoEm || 0) ? l.sessao : s.sessao,
+    sessaoEm: Math.max(l.sessaoEm || 0, s.sessaoEm || 0),
+    descanso: l.descanso || s.descanso,
+    repoIgnorado: l.repoIgnorado || s.repoIgnorado,
+  };
+}
+
+async function api(rota, opts = {}) {
+  const r = await fetch(`/api/${rota}`, {
+    ...opts,
+    headers: { 'content-type': 'application/json', ...(auth?.token ? { authorization: `Bearer ${auth.token}` } : {}) },
+  });
+  const corpo = await r.json().catch(() => ({}));
+  if (r.status === 401 && rota !== 'entrar') { encerrar('Sua sessão expirou. Entre de novo.'); throw new Error('sessao'); }
+  return { status: r.status, ...corpo };
+}
+
+let timerPush = null;
+function salvar(opts = {}) {
+  if (opts.sessao) sessaoEm = Date.now();
+  if (opts.ficha) fichaEm = Date.now();
+  sujo = true;
+  guardarCache();
+  marcarSync('salvando');
+  clearTimeout(timerPush);
+  timerPush = setTimeout(enviar, 1200);
+}
+
+let enviando = false;
+async function enviar() {
+  if (!auth || !sujo || enviando) return;
+  enviando = true;
+  try {
+    for (let tentativa = 0; tentativa < 3 && sujo; tentativa++) {
+      const enviado = JSON.stringify(coletar());
+      const r = await api('dados', { method: 'PUT', body: JSON.stringify({ rev, dados: JSON.parse(enviado) }) });
+      if (r.status === 200) {
+        rev = r.rev;
+        sujo = JSON.stringify(coletar()) !== enviado;   // mudou algo enquanto enviava?
+      } else if (r.status === 409) {
+        aplicar(mesclar(r.dados, coletar()));
+        rev = r.rev;
+        if (view.tela !== 'treino') render();
+      } else throw new Error(r.mensagem || 'erro');
     }
-    perfis.push(p);
-    store.set('perfis', perfis);
+    guardarCache();
+    marcarSync(sujo ? 'salvando' : 'ok');
+    if (sujo) timerPush = setTimeout(enviar, 1200);
+  } catch (e) {
+    if (e.message !== 'sessao') marcarSync('offline');
+  } finally {
+    enviando = false;
   }
-  perfilId = p.id;
-  store.set('perfilAtual', perfilId);
-  carregarPerfil();
+}
+
+// Busca a versão do servidor (ao abrir o app e ao voltar para ele).
+async function puxar() {
+  if (!auth) return;
+  try {
+    if (sujo) return enviar();
+    const r = await api('dados');
+    if (r.status !== 200) throw new Error();
+    if (r.rev !== rev || !carregado) {
+      const antes = JSON.stringify(coletar());
+      rev = r.rev;
+      aplicar(r.dados);
+      carregado = true;
+      guardarCache();
+      if (JSON.stringify(coletar()) !== antes && !document.activeElement?.matches('input, textarea')) render();
+    }
+    await fichaBase();
+    marcarSync('ok');
+  } catch (e) {
+    if (e.message !== 'sessao') { marcarSync('offline'); if (!carregado) render(); }
+  }
+}
+
+// Ficha base do repositório (docs/treino.json): quem ainda não tem ficha recebe uma cópia,
+// e quem segue a do repo é avisado quando ela muda.
+async function fichaBase() {
+  try {
+    const r = await fetch('treino.json', { cache: 'no-store' });
+    if (!r.ok) return;
+    const base = { ...(await r.json()), origem: 'repo' };
+    if (!plano) { plano = base; salvar({ ficha: true }); render(); }
+    else if (plano.origem === 'repo' && base.importadoEm !== plano.importadoEm && repoIgnorado !== base.importadoEm && !pendente) { pendente = base; if (view.tela === 'home') render(); }
+  } catch {}
+}
+
+function marcarSync(estado) {
+  sync = estado;
+  const el = document.getElementById('sync');
+  if (el) { el.className = `sync ${sync}`; el.textContent = TEXTO_SYNC[sync]; }
+}
+const TEXTO_SYNC = { ok: 'Salvo', salvando: 'Salvando…', offline: 'Sem conexão · salvo no aparelho' };
+
+function encerrar(msg) {
+  auth = null; gravarAuth(null);
+  aplicar(null); rev = 0; sujo = false; carregado = false;
+  fimDescanso = 0; clearInterval(tick); telaLigada(false);
+  login = { etapa: 'form', erro: msg || '', nome: dono?.nome || '', carregando: false };
+  view = { tela: 'home' };
+  render();
+}
+
+async function entrar(nome, pin, lembrar, criar) {
+  login = { ...login, nome, carregando: true, erro: '' };
+  render();
+  let r;
+  try {
+    r = await api('entrar', { method: 'POST', body: JSON.stringify({ nome, pin, lembrar, criar }) });
+  } catch {
+    login = { ...login, carregando: false, erro: 'Sem conexão. Para entrar a primeira vez neste aparelho você precisa de internet.' };
+    return render();
+  }
+  if (r.status === 404) { login = { etapa: 'criar', nome, pin, lembrar, erro: '', carregando: false }; return render(); }
+  if (r.status !== 200) { login = { ...login, etapa: 'form', carregando: false, erro: r.mensagem || 'Não consegui entrar.' }; return render(); }
+
+  auth = { token: r.token, nome: r.nome, slug: r.slug };
+  gravarAuth(auth, lembrar);
+  if (!dono) { dono = { slug: r.slug, nome: r.nome }; store.set('dono', dono); }
+
+  // Se este aparelho tem treino feito offline ainda não enviado, junta com o do servidor.
+  const cache = store.get(CACHE(), null);
+  rev = r.rev;
+  aplicar(cache?.sujo ? mesclar(r.dados, cache.dados) : r.dados);
+  sujo = !!cache?.sujo;
+  carregado = true;
+  guardarCache();
+  login = { etapa: 'form', erro: '', nome: '', carregando: false };
   view = { tela: 'home' };
   if (sessao && treino(sessao.treinoId) && contagem(treino(sessao.treinoId)).ok > 0) view = { tela: 'treino', id: sessao.treinoId };
   render();
   window.scrollTo({ top: 0 });
+  if (sujo) enviar();
+  await fichaBase();
 }
-function sair() {
-  perfilId = null; store.del('perfilAtual');
-  fimDescanso = 0; clearInterval(tick); telaLigada(false);
-  view = { tela: 'home' };
-  render();
+
+async function sair() {
+  try { await api('sair', { method: 'POST' }); } catch {}
+  encerrar();
 }
+
 let view = { tela: 'home' };
-let pendente = null;                      // plano lido do PDF esperando confirmação
+let pendente = null;                      // ficha nova (PDF ou repo) esperando confirmação
 let erroImport = '';
 
 const $app = document.getElementById('app');
@@ -407,6 +569,7 @@ const norm = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().rep
 const dataBR = (iso) => new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
 const diaBR = (iso) => new Date(iso).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' });
 const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.max(0, s) % 60).padStart(2, '0')}`;
+const novoId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
 const ICON = {
   check: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
@@ -414,6 +577,7 @@ const ICON = {
   back: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M15 6l-6 6 6 6"/></svg>',
   upload: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg>',
   swap: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4L3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"/></svg>',
+  nota: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4"/></svg>',
 };
 
 function toast(msg) {
@@ -432,7 +596,7 @@ function proximoId() {
   const i = plano.treinos.findIndex((t) => t.id === ult.treinoId);
   return plano.treinos[(i + 1) % plano.treinos.length].id;
 }
-// Cargas lembradas por treino + nome (+ ocorrência), já que o mesmo exercício
+// Cargas e anotações por treino + nome (+ ocorrência), já que o mesmo exercício
 // pode aparecer em treinos diferentes com cargas diferentes.
 function chaveEx(ex) {
   const t = plano.treinos.find((t) => t.exercicios.includes(ex));
@@ -456,31 +620,52 @@ function contagem(t) {
 // ---------- telas ----------
 function renderLogin() {
   $dock.hidden = true;
+  const d = login;
+  if (d.etapa === 'criar') {
+    $app.innerHTML = `
+      <header class="plano"><div class="eyebrow">Nova conta</div><h1>Prazer, ${esc(d.nome)}</h1></header>
+      <form class="painel" id="form-criar" novalidate>
+        <p>Ainda não existe ninguém com esse nome. Confirme o PIN para criar sua conta. Você vai receber a ficha base e suas cargas e anotações ficam só suas.</p>
+        <label class="eyebrow" for="pin-confirma">Digite o PIN de novo</label>
+        <input class="campo pin" id="pin-confirma" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="new-password" placeholder="••••">
+        ${d.erro ? `<p class="msg-erro" role="alert">${esc(d.erro)}</p>` : ''}
+        <button class="btn primary" type="submit" ${d.carregando ? 'disabled' : ''}>${d.carregando ? 'Criando…' : 'Criar conta'}</button>
+        <button class="btn ghost" type="button" data-a="corrigir-nome">Errei o nome</button>
+      </form>`;
+    document.getElementById('pin-confirma').focus();
+    return;
+  }
   $app.innerHTML = `
     <header class="plano">
-      <div class="eyebrow">${plano ? `Rotina ${esc(plano.rotina)} · ${plano.treinos.length} treinos` : 'Ficha de treino'}</div>
-      <h1>Quem vai treinar?</h1>
+      <div class="eyebrow">Ficha de treino</div>
+      <h1>${dono ? `Olá, ${esc(dono.nome)}` : 'Entrar'}</h1>
     </header>
-    ${perfis.length ? `<section class="treinos" aria-label="Perfis">
-      ${perfis.map((p) => `<button class="treino-card perfil" data-a="entrar" data-id="${p.id}">
-        <span class="letra" aria-hidden="true">${esc(p.nome.charAt(0).toUpperCase())}</span>
-        <span class="nome">${esc(p.nome)}</span>
-        ${ICON.chev}
-      </button>`).join('')}
-    </section>` : ''}
-    <form class="painel" id="form-perfil" novalidate>
-      <label class="eyebrow" for="nome-perfil">${perfis.length ? 'Primeira vez aqui?' : 'Seu nome'}</label>
-      <input class="campo" id="nome-perfil" maxlength="30" autocomplete="given-name" autocapitalize="words" placeholder="Como você quer ser chamado" required>
-      <button class="btn primary" type="submit">Entrar</button>
-      <p class="muted">Seu histórico e suas cargas ficam salvos neste aparelho, separados de quem mais usar o app nele.</p>
+    <form class="painel" id="form-entrar" novalidate>
+      ${dono ? `<input type="hidden" id="nome-login" value="${esc(dono.nome)}">`
+        : `<label class="eyebrow" for="nome-login">Nome</label>
+           <input class="campo" id="nome-login" maxlength="30" autocomplete="username" autocapitalize="words" placeholder="Seu nome" value="${esc(d.nome)}">`}
+      <label class="eyebrow" for="pin-login">PIN</label>
+      <input class="campo pin" id="pin-login" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="current-password" placeholder="••••">
+      <label class="lembrar" for="lembrar"><input type="checkbox" id="lembrar" checked> Lembrar de mim neste aparelho</label>
+      ${d.erro ? `<p class="msg-erro" role="alert">${esc(d.erro)}</p>` : ''}
+      <button class="btn primary" type="submit" ${d.carregando ? 'disabled' : ''}>${d.carregando ? 'Entrando…' : 'Entrar'}</button>
+      <p class="muted">${dono ? 'Este aparelho é seu. Suas cargas, anotações e histórico ficam salvos na sua conta e aparecem igual em qualquer aparelho em que você entrar.'
+        : 'Primeira vez? Escolha um PIN de 4 números. Suas cargas, anotações e histórico ficam na sua conta e aparecem igual no celular e no computador.'}</p>
     </form>`;
+  document.getElementById(dono ? 'pin-login' : (d.nome ? 'pin-login' : 'nome-login')).focus();
 }
 
 function render() {
-  if (!perfil()) return renderLogin();
+  if (!auth) return renderLogin();
+  if (!carregado && !plano) {
+    $dock.hidden = true;
+    $app.innerHTML = `<header class="plano"><div class="eyebrow">${esc(auth.nome)}</div><h1>Carregando seus treinos…</h1></header>
+      ${sync === 'offline' ? '<section class="painel erro"><p>Sem conexão. Seus treinos aparecem assim que a internet voltar.</p></section>' : ''}`;
+    return;
+  }
   if (view.tela === 'treino' && treino(view.id)) return renderTreino(treino(view.id));
   if (view.tela === 'historico') return renderHistorico();
-  view = { tela: 'home' };
+  view = { tela: 'home', dados: view.dados };
   renderHome();
 }
 
@@ -491,22 +676,24 @@ function painelImport() {
       <div class="eyebrow">${pendente.origem === 'repo' ? 'Ficha nova disponível' : 'PDF lido'}</div>
       <p>Rotina ${esc(pendente.rotina)} · ${pendente.treinos.length} treinos, ${n} exercícios</p>
       <ul class="preview-list">${pendente.treinos.map((t) => `<li>Treino ${t.id} (${esc(t.titulo)}): ${t.exercicios.length} exercícios</li>`).join('')}</ul>
-      <p class="muted">Isso substitui a ficha atual. O histórico e as cargas que você já registrou continuam.</p>
-      <div class="row"><button class="btn primary" data-a="confirmar-import">Usar esta ficha</button><button class="btn ghost" data-a="cancelar-import">Cancelar</button></div>
+      <p class="muted">Isso substitui a sua ficha. Seu histórico, suas cargas e suas anotações continuam.</p>
+      <div class="row"><button class="btn primary" data-a="confirmar-import">Usar esta ficha</button><button class="btn ghost" data-a="cancelar-import">${pendente.origem === 'repo' ? 'Manter a minha' : 'Cancelar'}</button></div>
     </section>`;
   }
   if (erroImport) return `<section class="painel erro"><p>${esc(erroImport)}</p></section>`;
   return '';
 }
 
+const chipSync = () => `<span class="sync ${sync}" id="sync">${TEXTO_SYNC[sync]}</span>`;
+
 function renderHome() {
   $dock.hidden = true;
   if (!plano) {
     $app.innerHTML = `
-      <header class="plano"><div class="eyebrow">Ficha de treino</div><h1>Carregue sua ficha</h1></header>
+      <header class="plano"><div class="spread"><span class="eyebrow">${esc(auth.nome)}</span>${chipSync()}</div><h1>Carregue sua ficha</h1></header>
       ${painelImport()}
       <section class="painel">
-        <p>Exporte o treino completo em PDF no MFIT e carregue aqui. O app separa os treinos, as séries e as cargas sozinho, e tudo fica salvo neste aparelho.</p>
+        <p>Exporte o treino completo em PDF no MFIT e carregue aqui. O app separa os treinos, as séries e as cargas sozinho.</p>
         <div class="row"><button class="btn primary" data-a="carregar">${ICON.upload} Carregar treino</button></div>
       </section>`;
     return;
@@ -515,8 +702,8 @@ function renderHome() {
   const emAndamento = sessao && treino(sessao.treinoId) && contagem(treino(sessao.treinoId)).ok > 0 ? sessao.treinoId : null;
   $app.innerHTML = `
     <header class="plano">
-      <div class="spread"><span class="eyebrow">Rotina ${esc(plano.rotina)}</span><button class="btn small ghost" data-a="sair">Trocar perfil</button></div>
-      <h1>${esc(perfil().nome)}</h1>
+      <div class="spread"><span class="eyebrow">Rotina ${esc(plano.rotina)}</span>${chipSync()}</div>
+      <h1>${esc(auth.nome)}</h1>
       <div class="meta"><span>${esc(plano.objetivo)}</span><span>${esc(plano.nivel)}</span><span>${plano.treinos.length} treinos</span></div>
     </header>
     ${painelImport()}
@@ -539,14 +726,20 @@ function renderHome() {
     <section class="row">
       <button class="btn" data-a="historico">Histórico${historico.length ? ` (${historico.length})` : ''}</button>
       <button class="btn" data-a="carregar">${ICON.upload} Carregar treino</button>
-      <button class="btn ghost" data-a="dados">Dados</button>
+      <button class="btn ghost" data-a="dados">Conta</button>
     </section>
     ${view.dados ? `<section class="painel">
-      <div class="eyebrow">Ficha em JSON</div>
-      <p>Para compartilhar pelo GitHub: salve isso como <b>treino.json</b> no repositório. Quem abrir o app sem ficha carregada recebe essa automaticamente.</p>
-      <textarea class="json" id="json-ficha" readonly>${esc(JSON.stringify(plano, null, 2))}</textarea>
-      <div class="row"><button class="btn small" data-a="copiar-json">Copiar JSON</button><button class="btn small" data-a="baixar-json">Baixar treino.json</button></div>
-      <p class="muted">Importada em ${diaBR(plano.importadoEm)}.</p>
+      <div class="eyebrow">Conta</div>
+      <p>Logado como <b>${esc(auth.nome)}</b>. Sua ficha foi ${plano.origem === 'repo' ? 'copiada da ficha base' : 'carregada do seu PDF'} em ${diaBR(plano.importadoEm)}.</p>
+      <div class="row">
+        <button class="btn small" data-a="sair">Sair</button>
+        ${dono ? `<button class="btn small danger" data-a="desvincular">Liberar este aparelho</button>` : ''}
+      </div>
+      <p class="muted">Sair pede o PIN de novo na próxima vez. Liberar o aparelho permite que outra pessoa entre nele.</p>
+      <details class="json-box"><summary class="eyebrow">Ficha em JSON</summary>
+        <textarea class="json" id="json-ficha" readonly>${esc(JSON.stringify(plano, null, 2))}</textarea>
+        <div class="row"><button class="btn small" data-a="copiar-json">Copiar JSON</button><button class="btn small" data-a="baixar-json">Baixar treino.json</button></div>
+      </details>
     </section>` : ''}`;
 }
 
@@ -565,11 +758,17 @@ function setRow(ex, i) {
 
 function exCard(ex) {
   const completo = ex.sets.every((_, i) => feito(ex, i));
+  const k = chaveEx(ex);
+  const nota = notas[k] || '';
   return `<article class="ex ${completo ? 'completo' : ''}" id="ex-${ex.id}">
     <h3>${esc(ex.nome)}</h3>
     <div class="prescricao"><span><b>Séries:</b> ${esc(ex.series)}</span><span><b>Carga:</b> ${esc(ex.carga)}</span></div>
     ${ex.instrucoes ? `<div class="instr">${esc(ex.instrucoes)}</div>` : ''}
     <div class="sets">${ex.sets.map((_, i) => setRow(ex, i)).join('')}</div>
+    <details class="nota" ${nota ? 'open' : ''}>
+      <summary>${ICON.nota} ${nota ? 'Minha anotação' : 'Anotação'}</summary>
+      <textarea id="nota-${ex.id}" data-nota="${esc(k)}" rows="2" placeholder="Ex.: banco na posição 4, pegada fechada">${esc(nota)}</textarea>
+    </details>
   </article>`;
 }
 
@@ -577,7 +776,7 @@ function renderTreino(t) {
   const conflito = sessao && sessao.treinoId !== t.id && treino(sessao.treinoId) && contagem(treino(sessao.treinoId)).ok > 0;
   if (!conflito && (!sessao || sessao.treinoId !== t.id)) {
     sessao = { treinoId: t.id, inicio: new Date().toISOString(), feitos: {}, cargas: {} };
-    store.set(pk('sessao'), sessao);
+    salvar({ sessao: true });
   }
   const { total, ok } = conflito ? { total: 0, ok: 0 } : contagem(t);
 
@@ -685,12 +884,10 @@ function renderHistorico() {
 }
 
 // ---------- ações ----------
-function salvarSessao() { store.set(pk('sessao'), sessao); }
-
 function finalizar() {
   const t = treino(sessao.treinoId);
   const entrada = {
-    treinoId: t.id, titulo: t.titulo, inicio: sessao.inicio, fim: new Date().toISOString(),
+    id: novoId(), treinoId: t.id, titulo: t.titulo, inicio: sessao.inicio, fim: new Date().toISOString(),
     exercicios: t.exercicios.map((ex) => ({
       nome: ex.nome,
       sets: ex.sets.map((s, i) => ({ alvo: s.reps, carga: String(cargaInicial(ex, i) || ''), feito: feito(ex, i) })),
@@ -701,8 +898,8 @@ function finalizar() {
     if (usadas.some(Boolean)) ultimas[chaveEx(ex)] = usadas;
   }
   historico.unshift(entrada);
-  store.set(pk('historico'), historico); store.set(pk('ultimas'), ultimas);
-  sessao = null; store.del(pk('sessao'));
+  sessao = null;
+  salvar({ sessao: true });
   fimDescanso = 0; clearInterval(tick); telaLigada(false);
   view = { tela: 'home' };
   render();
@@ -727,15 +924,20 @@ $app.addEventListener('click', async (ev) => {
   const b = ev.target.closest('[data-a]');
   if (!b) return;
   const a = b.dataset.a;
-  if (a === 'entrar') entrar(perfis.find((p) => p.id === b.dataset.id)?.nome || '');
+  if (a === 'corrigir-nome') { login = { etapa: 'form', nome: login.nome, erro: '' }; render(); }
   else if (a === 'sair') sair();
+  else if (a === 'desvincular') {
+    if (!b.dataset.sure) { b.dataset.sure = '1'; b.textContent = 'Toque de novo para liberar'; return; }
+    store.del('dono'); store.del(CACHE()); dono = null; sair();
+  }
   else if (a === 'carregar') document.getElementById('arquivo-pdf').click();
   else if (a === 'confirmar-import') {
-    plano = pendente; pendente = null; store.set('plano', plano);
-    if (sessao && !treino(sessao.treinoId)) { sessao = null; store.del(pk('sessao')); }
+    plano = pendente; pendente = null;
+    if (sessao && !treino(sessao.treinoId)) sessao = null;
+    salvar({ ficha: true, sessao: true });
     render(); toast('Ficha atualizada');
   } else if (a === 'cancelar-import') {
-    if (pendente?.origem === 'repo') store.set('repoIgnorado', pendente.importadoEm);
+    if (pendente?.origem === 'repo') { repoIgnorado = pendente.importadoEm; salvar(); }
     pendente = null; erroImport = ''; render();
   }
   else if (a === 'abrir') { view = { tela: 'treino', id: b.dataset.id }; render(); window.scrollTo({ top: 0 }); telaLigada(true); }
@@ -759,7 +961,7 @@ $app.addEventListener('click', async (ev) => {
     const inp = document.getElementById(`kg-${ex}-${i}`);
     sessao.cargas[ex] = sessao.cargas[ex] || [];
     sessao.cargas[ex][i] = inp.value.trim().replace(',', '.');
-    salvarSessao();
+    salvar({ sessao: true });
     const y = window.scrollY;
     view.confirmaFim = false;
     render(); window.scrollTo({ top: y });
@@ -772,26 +974,42 @@ $app.addEventListener('click', async (ev) => {
   } else if (a === 'cancelar-fim') { view.confirmaFim = false; render(); }
   else if (a === 'descartar') {
     if (!b.dataset.sure) { b.dataset.sure = '1'; b.textContent = 'Toque de novo para descartar'; return; }
-    sessao = null; store.del(pk('sessao')); fimDescanso = 0; clearInterval(tick);
+    sessao = null; salvar({ sessao: true }); fimDescanso = 0; clearInterval(tick);
     view = { tela: 'treino', id: b.dataset.id }; render(); toast('Séries descartadas');
   }
 });
 
 $app.addEventListener('submit', (ev) => {
-  if (ev.target.id !== 'form-perfil') return;
   ev.preventDefault();
-  const inp = document.getElementById('nome-perfil');
-  if (!inp.value.trim()) { inp.focus(); toast('Digite seu nome para entrar'); return; }
-  entrar(inp.value);
+  if (ev.target.id === 'form-entrar') {
+    const nome = document.getElementById('nome-login').value.trim();
+    const pin = document.getElementById('pin-login').value.trim();
+    const lembrar = document.getElementById('lembrar').checked;
+    if (!nome) { login.erro = 'Digite seu nome.'; return render(); }
+    if (!/^\d{4}$/.test(pin)) { login = { ...login, nome, erro: 'O PIN tem 4 números.' }; return render(); }
+    entrar(nome, pin, lembrar, false);
+  } else if (ev.target.id === 'form-criar') {
+    const pin2 = document.getElementById('pin-confirma').value.trim();
+    if (pin2 !== login.pin) { login.erro = 'Os PINs não batem. Digite o mesmo PIN de antes.'; return render(); }
+    entrar(login.nome, login.pin, login.lembrar, true);
+  }
 });
 
+let timerNota = null;
 $app.addEventListener('input', (ev) => {
+  const nota = ev.target.closest('textarea[data-nota]');
+  if (nota) {
+    const v = nota.value.trim();
+    if (v) notas[nota.dataset.nota] = nota.value; else delete notas[nota.dataset.nota];
+    clearTimeout(timerNota); timerNota = setTimeout(() => salvar(), 400);
+    return;
+  }
   const inp = ev.target.closest('input[data-ex]');
   if (!inp || !sessao) return;
   const { ex, i } = inp.dataset;
   sessao.cargas[ex] = sessao.cargas[ex] || [];
   sessao.cargas[ex][i] = inp.value.trim().replace(',', '.');
-  salvarSessao();
+  salvar({ sessao: true });
 });
 
 $dock.addEventListener('click', (ev) => {
@@ -804,7 +1022,7 @@ $dock.addEventListener('click', (ev) => {
   else if (a === 'desc-tempo') {
     const op = [60, 90, 120, 180];
     descansoSeg = op[(op.indexOf(descansoSeg) + 1) % op.length];
-    store.set(pk('descanso'), descansoSeg); renderDock();
+    salvar(); renderDock();
   }
 });
 
@@ -814,20 +1032,26 @@ document.getElementById('arquivo-pdf').addEventListener('change', (ev) => {
   if (f) lerPdf(f);
 });
 
+// sincroniza ao voltar para o app e quando a internet volta
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') puxar(); });
+window.addEventListener('online', () => (sujo ? enviar() : puxar()));
+setInterval(() => { if (sujo && !enviando) enviar(); }, 30000);
+
 // ---------- início ----------
-async function iniciar() {
-  // Modo repositório: um treino.json publicado junto com o app vira a ficha inicial,
-  // e quem segue a ficha do repo é avisado quando ela muda.
-  try {
-    const r = await fetch('treino.json', { cache: 'no-store' });
-    if (r.ok) {
-      const doRepo = { ...(await r.json()), origem: 'repo' };
-      if (!plano) { plano = doRepo; store.set('plano', plano); }
-      else if (plano.origem === 'repo' && doRepo.importadoEm !== plano.importadoEm && store.get('repoIgnorado') !== doRepo.importadoEm) pendente = doRepo;
+function iniciar() {
+  if (auth) {
+    const cache = store.get(CACHE(), null);
+    if (cache) {
+      rev = cache.rev; sujo = cache.sujo; aplicar(cache.dados); carregado = true;
+      if (sujo) sync = 'salvando';
+      if (sessao && treino(sessao.treinoId) && contagem(treino(sessao.treinoId)).ok > 0) view = { tela: 'treino', id: sessao.treinoId };
     }
-  } catch {}
-  if (perfil() && sessao && treino(sessao.treinoId) && contagem(treino(sessao.treinoId)).ok > 0) view = { tela: 'treino', id: sessao.treinoId };
-  render();
+    render();
+    puxar();
+  } else {
+    login.nome = dono?.nome || '';
+    render();
+  }
 }
 iniciar();
 </script>

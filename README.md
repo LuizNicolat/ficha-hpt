@@ -1,44 +1,49 @@
 # Ficha Hpt
 
-App de treino (PWA) que lê o PDF exportado do MFIT e monta a ficha: treinos A–E, séries, cargas, instruções e exercícios combinados. Tudo fica salvo no aparelho (localStorage), sem servidor.
+App de treino (PWA) que lê o PDF exportado do MFIT e monta a ficha: treinos A–E, séries, cargas, instruções e exercícios combinados. Cada pessoa tem uma conta (nome + PIN) com a própria ficha, cargas, anotações e histórico, sincronizados entre celular e computador.
 
 ## Como funciona
 
-- **Perfis**: ao abrir, a pessoa escolhe o perfil ou entra com o nome. Histórico, cargas e treino em andamento são de cada perfil (dá pra dividir o mesmo celular). A ficha é a mesma para todos e não guarda o nome do aluno do PDF.
-
-- **Carregar treino**: escolhe o PDF do MFIT, o app lê no próprio navegador (pdf.js) e mostra um resumo antes de substituir a ficha.
-- **Durante o treino**: cada série tem o alvo de reps, a carga (pré-preenchida com a última que você usou, ou a da ficha) e um botão de concluir. Concluir dispara o descanso (60/90/120/180 s).
-- **Histórico**: cada treino finalizado fica salvo com as cargas por série.
-- **Ficha compartilhada**: se existir `docs/treino.json` no repo, quem abrir o app sem ficha recebe essa automaticamente. Quando o JSON muda, o app avisa e pergunta se quer atualizar. Histórico e cargas de cada pessoa ficam no celular dela.
+- **Conta**: nome + PIN de 4 números, com "lembrar de mim". No primeiro acesso a pessoa recebe uma cópia da ficha base (`docs/treino.json`).
+- **Aparelho travado**: o primeiro usuário que entra num aparelho fica dono dele; ali só ele entra. "Conta → Liberar este aparelho" desfaz.
+- **Dados de cada um**: cargas usadas, anotações por exercício, histórico e treino em andamento. Ficam no Cloudflare KV, um JSON por pessoa.
+- **Offline**: sem internet, tudo é salvo no aparelho e enviado quando a conexão volta. Se dois aparelhos mudarem ao mesmo tempo, o histórico dos dois é somado.
+- **Carregar treino**: a pessoa pode trocar a ficha dela pelo PDF dela. A ficha base continua igual para os outros.
+- **Ficha base nova**: quando `docs/treino.json` muda, quem segue a ficha base recebe um aviso e escolhe se atualiza.
+- **Segurança do PIN**: guardado com PBKDF2 + salt; 5 erros bloqueiam o usuário por 15 minutos.
 
 ## Estrutura
 
 ```
-parser.js              parser do PDF (usado pelo app e pelo script)
-src/app.html           tela do app (HTML + CSS + JS)
-build.mjs              junta tudo em docs/index.html
-gerar-json.mjs         PDF -> docs/treino.json (linha de comando)
-docs/                  o que vai pro GitHub Pages
-.github/workflows/     opcional: gera o treino.json sozinho ao subir treino.pdf
+parser.js                  parser do PDF (usado pelo app e pelo script)
+src/app.html               tela do app (HTML + CSS + JS)
+build.mjs                  junta tudo em docs/index.html
+gerar-json.mjs             PDF -> docs/treino.json (ficha base)
+functions/api/[[rota]].js  API (Cloudflare Pages Functions): entrar, dados, sair
+docs/                      o site publicado
+.github/workflows/         opcional: gera o treino.json sozinho ao subir treino.pdf
 ```
 
-## Rodando
+## Publicando (Cloudflare Pages + KV)
+
+1. Pages conectado ao repo, com **Build command** vazio e **Build output directory** `docs`.
+2. Workers & Pages → **KV** → **Create namespace** com o nome `ficha-hpt`.
+3. No projeto do Pages → **Settings** → **Bindings** (ou *Functions → KV namespace bindings*) → **Add** → KV namespace:
+   - Variable name: `FICHA_KV`
+   - Namespace: `ficha-hpt`
+   - Ambiente **Production** (e Preview, se quiser testar branches)
+4. Refaça o deploy (Deployments → último deploy → *Retry deployment*) para o binding valer.
+
+## Rodando local
 
 ```bash
 npm install
-npm run build                      # gera docs/index.html
-npm run gerar                      # treino.pdf -> docs/treino.json
-npx serve docs                     # testar local
+npm run build                                   # gera docs/index.html
+npm run gerar                                   # treino.pdf -> docs/treino.json
+npx wrangler pages dev docs --kv FICHA_KV       # site + API em http://localhost:8788
 ```
 
-## Publicando no GitHub Pages
-
-1. Suba o repo.
-2. Settings → Pages → Source: *Deploy from a branch*, branch `main`, pasta `/docs`.
-3. Mande o link pros amigos e peça pra "Adicionar à tela inicial".
-
-Para atualizar a ficha: rode `npm run gerar` com o PDF novo e commite o `docs/treino.json`.
-Ou suba o `treino.pdf` na raiz e deixe a Action gerar o JSON. Atenção: com repo público, o PDF (com nome e fotos) fica visível. Se preferir, gere o JSON local e não commite o PDF.
+Para atualizar a ficha base: rode `npm run gerar` com o PDF novo e commite o `docs/treino.json`. Não commite o PDF (tem nome e fotos).
 
 ## Sobre o parser
 
