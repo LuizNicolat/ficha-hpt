@@ -157,6 +157,19 @@ textarea.json { width: 100%; min-height: 120px; font: 12px/1.4 ui-monospace, Men
 .nota textarea:focus { border-color: var(--accent); outline: none; }
 .json-box summary { cursor: pointer; padding: 4px 0; }
 .json-box[open] { display: grid; gap: 8px; }
+/* Admin */
+.chip.alerta { background: var(--warn); color: var(--surface); }
+.treino-card.usuario { grid-template-columns: 44px 1fr auto; }
+.treino-card.usuario .letra { width: 44px; height: 44px; font-size: 22px; border-width: 2px; }
+.sessao-mini { border-top: 1px solid var(--line); padding-top: 8px; }
+.sessao-mini summary { cursor: pointer; display: flex; flex-wrap: wrap; gap: 4px 8px; font-size: 14.5px; }
+.sessao-mini .corpo { display: grid; gap: 6px; padding-top: 8px; font-size: 13.5px; }
+.sessao-mini .linha { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.sessao-mini .linha span:last-child { color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; }
+.linha-nota { display: grid; gap: 2px; font-size: 14px; border-top: 1px solid var(--line); padding-top: 8px; }
+.linha-nota span { color: var(--muted); white-space: pre-wrap; }
+.painel.perigo { border-color: var(--warn); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 
@@ -374,6 +387,7 @@ function gravarAuth(a, lembrar) {
   try { (lembrar ? localStorage : sessionStorage).setItem(AUTH, JSON.stringify(a)); } catch {}
 }
 let auth = lerAuth();
+const lembrado = () => { try { return !!localStorage.getItem(AUTH); } catch { return false; } };
 let dono = store.get('dono', null);   // { slug, nome }: o aparelho fica preso ao primeiro usuário
 let login = { etapa: 'form', erro: '', nome: '', carregando: false };
 
@@ -477,6 +491,7 @@ async function puxar() {
     if (sujo) return enviar();
     const r = await api('dados');
     if (r.status !== 200) throw new Error();
+    if (!!r.admin !== !!auth.admin) { auth.admin = !!r.admin; gravarAuth(auth, lembrado()); if (view.tela === 'home') render(); }
     if (r.rev !== rev || !carregado) {
       const antes = JSON.stringify(coletar());
       rev = r.rev;
@@ -538,7 +553,7 @@ async function entrar(nome, pin, lembrar, criar) {
     return render();
   }
 
-  auth = { token: r.token, nome: r.nome, slug: r.slug };
+  auth = { token: r.token, nome: r.nome, slug: r.slug, admin: !!r.admin };
   gravarAuth(auth, lembrar);
   if (!dono) { dono = { slug: r.slug, nome: r.nome }; store.set('dono', dono); }
 
@@ -670,6 +685,8 @@ function render() {
   }
   if (view.tela === 'treino' && treino(view.id)) return renderTreino(treino(view.id));
   if (view.tela === 'historico') return renderHistorico();
+  if (view.tela === 'admin' && auth.admin) return renderAdmin();
+  if (view.tela === 'admin-usuario' && auth.admin) return renderAdminUsuario();
   view = { tela: 'home', dados: view.dados };
   renderHome();
 }
@@ -732,6 +749,7 @@ function renderHome() {
       <button class="btn" data-a="historico">Histórico${historico.length ? ` (${historico.length})` : ''}</button>
       <button class="btn" data-a="carregar">${ICON.upload} Carregar treino</button>
       <button class="btn ghost" data-a="dados">Conta</button>
+      ${auth.admin ? '<button class="btn ghost" data-a="admin">Admin</button>' : ''}
     </section>
     ${view.dados ? `<section class="painel">
       <div class="eyebrow">Conta</div>
@@ -888,6 +906,147 @@ function renderHistorico() {
     }).join('') : '<section class="painel"><p>Quando você finalizar um treino, ele aparece aqui com as cargas de cada série.</p></section>'}`;
 }
 
+// ---------- admin ----------
+let adm = { lista: null, det: null, erro: '', carregando: false, pdfPara: null };
+
+async function admCarregarLista() {
+  adm = { ...adm, carregando: true, erro: '' };
+  render();
+  try {
+    const r = await api('admin/usuarios');
+    if (r.status !== 200) throw new Error(r.mensagem || 'Não consegui carregar os usuários.');
+    adm.lista = r.usuarios;
+  } catch (e) { if (e.message !== 'sessao') adm.erro = e.message; }
+  adm.carregando = false;
+  if (view.tela === 'admin') render();
+}
+async function admCarregarUsuario(slug) {
+  adm = { ...adm, det: adm.det?.usuario.slug === slug ? adm.det : null, carregando: true, erro: '' };
+  render();
+  try {
+    const r = await api(`admin/usuarios/${slug}`);
+    if (r.status !== 200) throw new Error(r.mensagem || 'Não consegui carregar esse usuário.');
+    adm.det = r;
+  } catch (e) { if (e.message !== 'sessao') adm.erro = e.message; }
+  adm.carregando = false;
+  if (view.tela === 'admin-usuario') render();
+}
+async function admAcao(slug, acao, metodo, corpo, okMsg) {
+  try {
+    const r = await api(`admin/usuarios/${slug}${acao ? '/' + acao : ''}`, { method: metodo, body: corpo ? JSON.stringify(corpo) : undefined });
+    if (r.status !== 200) throw new Error(r.mensagem || 'Não deu certo.');
+    toast(typeof okMsg === 'function' ? okMsg(r) : okMsg);
+    return r;
+  } catch (e) {
+    if (e.message !== 'sessao') toast(e.message);
+    return null;
+  }
+}
+
+const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
+const quando = (iso) => {
+  if (!iso) return 'nunca';
+  const dias = Math.floor((Date.now() - new Date(iso)) / 86400000);
+  return dias <= 0 ? 'hoje' : dias === 1 ? 'ontem' : `há ${dias} dias`;
+};
+
+function renderAdmin() {
+  $dock.hidden = true;
+  const l = adm.lista;
+  $app.innerHTML = `
+    <div class="spread"><button class="voltar" data-a="home">${ICON.back} Treinos</button><button class="btn small ghost" data-a="adm-atualizar">Atualizar</button></div>
+    <header class="plano"><div class="eyebrow">Admin</div><h1>Usuários</h1>
+      ${l ? `<div class="meta"><span>${l.length} ${l.length === 1 ? 'pessoa' : 'pessoas'}</span><span>${plural(l.reduce((a, u) => a + u.treinos, 0), 'treino registrado', 'treinos registrados')}</span></div>` : ''}
+    </header>
+    ${adm.erro ? `<section class="painel erro"><p>${esc(adm.erro)}</p></section>` : ''}
+    ${!l ? `<p class="muted">${adm.carregando ? 'Carregando…' : ''}</p>` : `<section class="treinos" aria-label="Usuários">
+      ${l.map((u) => `<button class="treino-card usuario" data-a="adm-abrir" data-slug="${esc(u.slug)}">
+        <span class="letra" aria-hidden="true">${esc(u.nome.charAt(0).toUpperCase())}</span>
+        <span class="info">
+          <span class="row"><span class="nome">${esc(u.nome)}</span>
+            ${u.admin ? '<span class="chip">Você</span>' : ''}
+            ${u.bloqueado ? '<span class="chip alerta">Bloqueado</span>' : ''}
+            ${u.emAndamento ? `<span class="chip ok">Treinando ${esc(u.emAndamento)}</span>` : ''}</span>
+          <span class="resumo num">${u.ultimoTreino ? `Último: Treino ${esc(u.ultimoTreino.treinoId)} ${quando(u.ultimoTreino.fim)}` : 'Ainda não treinou'} · ${plural(u.treinos, 'treino', 'treinos')} · ${u.ficha ? (u.ficha.origem === 'repo' ? 'ficha base' : 'ficha própria') : 'sem ficha'}</span>
+        </span>
+        ${ICON.chev}
+      </button>`).join('')}
+    </section>`}`;
+}
+
+function renderAdminUsuario() {
+  $dock.hidden = true;
+  const det = adm.det;
+  if (!det) {
+    $app.innerHTML = `<div class="spread"><button class="voltar" data-a="admin">${ICON.back} Usuários</button></div>
+      ${adm.erro ? `<section class="painel erro"><p>${esc(adm.erro)}</p></section>` : '<p class="muted">Carregando…</p>'}`;
+    return;
+  }
+  const u = det.usuario, d = det.dados || {};
+  const hist = d.historico || [];
+  const ficha = d.ficha;
+  const notasLista = Object.entries(d.notas || {});
+  const nomeDaNota = (k) => { const [tid, n] = k.split('|'); const ex = ficha?.treinos.find((t) => t.id === tid)?.exercicios.find((e) => norm(e.nome) === n); return `Treino ${tid} · ${ex ? ex.nome : n}`; };
+  $app.innerHTML = `
+    <div class="spread"><button class="voltar" data-a="admin">${ICON.back} Usuários</button>${adm.carregando ? '<span class="muted">Atualizando…</span>' : ''}</div>
+    <header class="plano">
+      <div class="eyebrow">Usuário${u.admin ? ' · você' : ''}</div>
+      <h1>${esc(u.nome)}</h1>
+      <div class="meta"><span>Conta criada ${quando(u.criadoEm)}</span><span>${plural(u.treinos, 'treino', 'treinos')}</span><span>${u.aparelhos} ${u.aparelhos === 1 ? 'aparelho conectado' : 'aparelhos conectados'}</span></div>
+    </header>
+
+    <section class="painel">
+      <div class="eyebrow">Ficha</div>
+      ${ficha ? `<p>${ficha.origem === 'repo' ? 'Ficha base' : 'Ficha própria (PDF)'} · Rotina ${esc(ficha.rotina)} · ${ficha.treinos.length} treinos · desde ${diaBR(ficha.importadoEm)}</p>
+        <p class="muted">${ficha.treinos.map((t) => `${t.id} ${esc(t.titulo)}`).join(' · ')}</p>` : '<p>Ainda não tem ficha.</p>'}
+      <div class="row">
+        <button class="btn small" data-a="adm-ficha-base" data-slug="${esc(u.slug)}">Enviar ficha base</button>
+        <button class="btn small" data-a="adm-ficha-pdf" data-slug="${esc(u.slug)}">${ICON.upload} Carregar PDF pra ${esc(u.nome.split(' ')[0])}</button>
+      </div>
+      <p class="muted">A ficha nova aparece no app da pessoa na próxima vez que ela abrir. Cargas, anotações e histórico continuam.</p>
+    </section>
+
+    <section class="painel">
+      <div class="eyebrow">Histórico</div>
+      ${hist.length ? hist.slice(0, 15).map((h) => {
+        const series = h.exercicios.reduce((a, e) => a + e.sets.filter((s) => s.feito).length, 0);
+        return `<details class="sessao-mini"><summary><b>Treino ${esc(h.treinoId)} · ${esc(h.titulo)}</b> <span class="muted num">${diaBR(h.fim)} · ${plural(series, 'série', 'séries')}</span></summary>
+          <div class="corpo">${h.exercicios.map((e) => `<div class="linha"><span>${esc(e.nome)}</span><span>${e.sets.filter((s) => s.feito).map((s) => s.carga || '–').join(' · ')} kg</span></div>`).join('')}</div></details>`;
+      }).join('') + (hist.length > 15 ? `<p class="muted">Mostrando os 15 mais recentes de ${hist.length}.</p>` : '') : '<p>Nenhum treino finalizado ainda.</p>'}
+    </section>
+
+    ${notasLista.length ? `<section class="painel">
+      <div class="eyebrow">Anotações</div>
+      ${notasLista.map(([k, v]) => `<div class="linha-nota"><b>${esc(nomeDaNota(k))}</b><span>${esc(v)}</span></div>`).join('')}
+    </section>` : ''}
+
+    <section class="painel">
+      <div class="eyebrow">Acesso</div>
+      ${u.bloqueado ? `<p class="msg-erro">Bloqueado por errar o PIN 5 vezes.</p><div class="row"><button class="btn small primary" data-a="adm-desbloquear" data-slug="${esc(u.slug)}">Desbloquear agora</button></div>`
+        : u.tentativas ? `<p class="muted">${u.tentativas} ${u.tentativas === 1 ? 'tentativa errada' : 'tentativas erradas'} de PIN nos últimos 15 minutos.</p>` : ''}
+      <form class="row" id="form-adm-pin" data-slug="${esc(u.slug)}" novalidate>
+        <label class="sr" for="adm-pin">Novo PIN</label>
+        <input class="campo pin" id="adm-pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="new-password" placeholder="••••" aria-label="Novo PIN">
+        <button class="btn small" type="submit">Definir novo PIN</button>
+      </form>
+      <p class="muted">Para quem esqueceu o PIN. ${u.admin ? '' : 'A pessoa é desconectada dos aparelhos e entra com o PIN novo.'}</p>
+      ${u.admin ? '' : `<div class="row"><button class="btn small" data-a="adm-desconectar" data-slug="${esc(u.slug)}">Desconectar de todos os aparelhos</button></div>`}
+    </section>
+
+    ${u.admin ? '' : `<section class="painel perigo">
+      <div class="eyebrow">Excluir</div>
+      <p>Apaga a conta de ${esc(u.nome)} com ficha, cargas, anotações e histórico. Não dá pra desfazer.</p>
+      <div class="row"><button class="btn small danger" data-a="adm-excluir" data-slug="${esc(u.slug)}">Excluir ${esc(u.nome.split(' ')[0])}</button></div>
+    </section>`}`;
+}
+
+async function admEnviarFicha(slug, ficha, origemTxt) {
+  const r = await admAcao(slug, 'ficha', 'PUT', { ficha }, `Ficha ${origemTxt} enviada`);
+  if (!r) return;
+  if (slug === auth.slug) puxar();   // a sua própria ficha: atualiza aqui também
+  admCarregarUsuario(slug);
+}
+
 // ---------- ações ----------
 function finalizar() {
   const t = treino(sessao.treinoId);
@@ -935,7 +1094,28 @@ $app.addEventListener('click', async (ev) => {
     if (!b.dataset.sure) { b.dataset.sure = '1'; b.textContent = 'Toque de novo para liberar'; return; }
     store.del('dono'); store.del(CACHE()); dono = null; sair();
   }
-  else if (a === 'carregar') document.getElementById('arquivo-pdf').click();
+  else if (a === 'admin') { view = { tela: 'admin' }; render(); window.scrollTo({ top: 0 }); admCarregarLista(); }
+  else if (a === 'adm-atualizar') admCarregarLista();
+  else if (a === 'adm-abrir') { view = { tela: 'admin-usuario', slug: b.dataset.slug }; adm.det = null; render(); window.scrollTo({ top: 0 }); admCarregarUsuario(b.dataset.slug); }
+  else if (a === 'adm-ficha-base') {
+    if (!b.dataset.sure) { b.dataset.sure = '1'; b.textContent = 'Toque de novo para enviar'; return; }
+    try {
+      const r = await fetch('treino.json', { cache: 'no-store' });
+      if (!r.ok) throw new Error();
+      admEnviarFicha(b.dataset.slug, { ...(await r.json()), origem: 'repo' }, 'base');
+    } catch { toast('Não consegui ler a ficha base (treino.json).'); }
+  }
+  else if (a === 'adm-ficha-pdf') { adm.pdfPara = b.dataset.slug; document.getElementById('arquivo-pdf').click(); }
+  else if (a === 'adm-desbloquear') { if (await admAcao(b.dataset.slug, 'desbloquear', 'POST', null, 'Desbloqueado')) admCarregarUsuario(b.dataset.slug); }
+  else if (a === 'adm-desconectar') {
+    if (!b.dataset.sure) { b.dataset.sure = '1'; b.textContent = 'Toque de novo para desconectar'; return; }
+    if (await admAcao(b.dataset.slug, 'desconectar', 'POST', null, (r) => `${r.desconectados} ${r.desconectados === 1 ? 'aparelho desconectado' : 'aparelhos desconectados'}`)) admCarregarUsuario(b.dataset.slug);
+  }
+  else if (a === 'adm-excluir') {
+    if (!b.dataset.sure) { b.dataset.sure = '1'; b.textContent = 'Toque de novo para excluir de vez'; return; }
+    if (await admAcao(b.dataset.slug, '', 'DELETE', null, 'Usuário excluído')) { view = { tela: 'admin' }; adm.det = null; admCarregarLista(); }
+  }
+  else if (a === 'carregar') { adm.pdfPara = null; document.getElementById('arquivo-pdf').click(); }
   else if (a === 'confirmar-import') {
     plano = pendente; pendente = null;
     if (sessao && !treino(sessao.treinoId)) sessao = null;
@@ -993,6 +1173,12 @@ $app.addEventListener('submit', (ev) => {
     if (!nome) { login.erro = 'Digite seu nome.'; return render(); }
     if (!/^\d{4}$/.test(pin)) { login = { ...login, nome, erro: 'O PIN tem 4 números.' }; return render(); }
     entrar(nome, pin, lembrar, false);
+  } else if (ev.target.id === 'form-adm-pin') {
+    const pin = document.getElementById('adm-pin').value.trim();
+    if (!/^\d{4}$/.test(pin)) { toast('O PIN tem 4 números.'); return; }
+    const slug = ev.target.dataset.slug;
+    admAcao(slug, 'pin', 'POST', { pin }, (r) => `PIN trocado${r.desconectados ? ` · ${r.desconectados} ${r.desconectados === 1 ? 'aparelho desconectado' : 'aparelhos desconectados'}` : ''}`)
+      .then((r) => { if (r) admCarregarUsuario(slug); });
   } else if (ev.target.id === 'form-criar') {
     const pin2 = document.getElementById('pin-confirma').value.trim();
     if (pin2 !== login.pin) { login.erro = 'Os PINs não batem. Digite o mesmo PIN de antes.'; return render(); }
@@ -1034,7 +1220,17 @@ $dock.addEventListener('click', (ev) => {
 document.getElementById('arquivo-pdf').addEventListener('change', (ev) => {
   const f = ev.target.files[0];
   ev.target.value = '';
-  if (f) lerPdf(f);
+  if (!f) return;
+  if (adm.pdfPara) {
+    const slug = adm.pdfPara; adm.pdfPara = null;
+    if (!window.pdfjsLib) { toast('Não consegui carregar o leitor de PDF.'); return; }
+    toast('Lendo o PDF…');
+    f.arrayBuffer().then((buf) => parseMfitPdf(window.pdfjsLib, new Uint8Array(buf)))
+      .then((ficha) => admEnviarFicha(slug, ficha, 'do PDF'))
+      .catch((e) => toast(e.message || 'Não consegui ler esse PDF.'));
+    return;
+  }
+  lerPdf(f);
 });
 
 // sincroniza ao voltar para o app e quando a internet volta

@@ -10,6 +10,7 @@ App de treino (PWA) que lê o PDF exportado do MFIT e monta a ficha: treinos A�
 - **Offline**: sem internet, tudo é salvo no aparelho e enviado quando a conexão volta. Se dois aparelhos mudarem ao mesmo tempo, o histórico dos dois é somado.
 - **Carregar treino**: a pessoa pode trocar a ficha dela pelo PDF dela. A ficha base continua igual para os outros.
 - **Ficha base nova**: quando `docs/treino.json` muda, quem segue a ficha base recebe um aviso e escolhe se atualiza.
+- **Admin**: quem está em `ADMINS` (no `wrangler.jsonc`) vê o botão Admin. Lá dá pra ver cada usuário (último treino, histórico, anotações), enviar a ficha base ou um PDF para alguém, definir novo PIN, desbloquear, desconectar dos aparelhos e excluir.
 - **Segurança do PIN**: guardado com PBKDF2 + salt; 5 erros bloqueiam o usuário por 15 minutos.
 
 ## Estrutura

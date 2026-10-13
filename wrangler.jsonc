@@ -8,6 +8,11 @@
     "directory": "./docs",
     "binding": "ASSETS"
   },
+  // Quem vê a área de Admin no app: o "slug" do nome (minúsculo, sem acento, espaços viram "-").
+  // Mais de um: "luiz,fulano"
+  "vars": {
+    "ADMINS": "luiz"
+  },
   // Onde ficam os dados de cada usuário
   "kv_namespaces": [
     {

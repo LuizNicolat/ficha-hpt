@@ -5,6 +5,15 @@
 // PUT  /api/dados    { rev, dados }                   -> { rev }  (409 + versão do servidor se rev estiver velho)
 // POST /api/sair
 //
+// Admin (slugs listados em ADMINS no wrangler.jsonc):
+// GET    /api/admin/usuarios                 lista com resumo
+// GET    /api/admin/usuarios/<slug>          dados completos
+// POST   /api/admin/usuarios/<slug>/pin      { pin }  novo PIN (desconecta os aparelhos)
+// POST   /api/admin/usuarios/<slug>/desbloquear
+// POST   /api/admin/usuarios/<slug>/desconectar
+// PUT    /api/admin/usuarios/<slug>/ficha    { ficha }  troca a ficha da pessoa
+// DELETE /api/admin/usuarios/<slug>
+//
 // Chaves no KV:
 //   u:<slug>   { nome, salt, hash, criadoEm }          usuário
 //   d:<slug>   { rev, dados, atualizadoEm }            o "JSON" de cada pessoa
@@ -42,13 +51,15 @@ async function lerCorpo(request) {
   try { return await request.json(); } catch { return null; }
 }
 
+const ehAdmin = (env, slug) => String(env.ADMINS || '').split(',').map((x) => x.trim()).filter(Boolean).includes(slug);
+
 async function usuarioDaSessao(request, kv) {
   const m = (request.headers.get('authorization') || '').match(/^Bearer ([a-f0-9]{64})$/);
   if (!m) return null;
   return kv.get(`s:${m[1]}`);
 }
 
-async function entrar(request, kv) {
+async function entrar(request, kv, env) {
   const corpo = await lerCorpo(request);
   const nome = String(corpo?.nome || '').trim().replace(/\s+/g, ' ').slice(0, 30);
   const pin = String(corpo?.pin || '');
@@ -79,9 +90,9 @@ async function entrar(request, kv) {
 
   if (tentativas) await kv.delete(`t:${slug}`);
   const token = aleatorio(32);
-  await kv.put(`s:${token}`, slug, { expirationTtl: corpo.lembrar ? 365 * DIA : DIA });
+  await kv.put(`s:${token}`, slug, { expirationTtl: corpo.lembrar ? 365 * DIA : DIA, metadata: { slug } });
   const registro = (await kv.get(`d:${slug}`, 'json')) || { rev: 0, dados: null };
-  return json({ token, nome: usuario.nome, slug, rev: registro.rev, dados: registro.dados });
+  return json({ token, nome: usuario.nome, slug, admin: ehAdmin(env, slug), rev: registro.rev, dados: registro.dados });
 }
 
 export default {
@@ -98,14 +109,14 @@ async function api(request, env, rota) {
 
   const metodo = request.method;
 
-  if (rota === 'entrar' && metodo === 'POST') return entrar(request, kv);
+  if (rota === 'entrar' && metodo === 'POST') return entrar(request, kv, env);
 
   const slug = await usuarioDaSessao(request, kv);
   if (!slug) return json({ erro: 'sessao', mensagem: 'Sua sessão expirou. Entre de novo.' }, 401);
 
   if (rota === 'dados' && metodo === 'GET') {
     const r = (await kv.get(`d:${slug}`, 'json')) || { rev: 0, dados: null };
-    return json({ rev: r.rev, dados: r.dados });
+    return json({ rev: r.rev, dados: r.dados, admin: ehAdmin(env, slug) });
   }
 
   if (rota === 'dados' && metodo === 'PUT') {
@@ -123,6 +134,116 @@ async function api(request, env, rota) {
   if (rota === 'sair' && metodo === 'POST') {
     const token = request.headers.get('authorization').slice(7);
     await kv.delete(`s:${token}`);
+    return json({ ok: true });
+  }
+
+  if (rota.startsWith('admin/')) {
+    if (!ehAdmin(env, slug)) return json({ erro: 'proibido', mensagem: 'Só o administrador pode fazer isso.' }, 403);
+    return admin(request, kv, rota.slice(6), slug);
+  }
+
+  return json({ erro: 'rota' }, 404);
+}
+
+// ---------- admin ----------
+async function listarChaves(kv, prefix) {
+  const chaves = [];
+  let cursor;
+  do {
+    const r = await kv.list({ prefix, cursor });
+    chaves.push(...r.keys);
+    cursor = r.list_complete ? null : r.cursor;
+  } while (cursor);
+  return chaves;
+}
+
+async function desconectar(kv, slug) {
+  const sessoes = (await listarChaves(kv, 's:')).filter((k) => k.metadata?.slug === slug);
+  await Promise.all(sessoes.map((k) => kv.delete(k.name)));
+  return sessoes.length;
+}
+
+function resumo(slug, u, d, tentativas, sessoes) {
+  const dados = d?.dados || {};
+  const hist = dados.historico || [];
+  return {
+    slug, nome: u.nome, criadoEm: u.criadoEm,
+    treinos: hist.length,
+    ultimoTreino: hist[0] ? { treinoId: hist[0].treinoId, titulo: hist[0].titulo, fim: hist[0].fim } : null,
+    atualizadoEm: d?.atualizadoEm || null,
+    ficha: dados.ficha ? { origem: dados.ficha.origem || 'pdf', rotina: dados.ficha.rotina, importadoEm: dados.ficha.importadoEm, treinos: dados.ficha.treinos?.length || 0 } : null,
+    emAndamento: dados.sessao?.treinoId || null,
+    bloqueado: tentativas >= MAX_TENTATIVAS,
+    tentativas,
+    aparelhos: sessoes,
+  };
+}
+
+async function admin(request, kv, rota, eu) {
+  const metodo = request.method;
+  const sessoesPor = async () => {
+    const m = {};
+    for (const k of await listarChaves(kv, 's:')) if (k.metadata?.slug) m[k.metadata.slug] = (m[k.metadata.slug] || 0) + 1;
+    return m;
+  };
+
+  if (rota === 'usuarios' && metodo === 'GET') {
+    const [chaves, sessoes] = await Promise.all([listarChaves(kv, 'u:'), sessoesPor()]);
+    const lista = await Promise.all(chaves.map(async ({ name }) => {
+      const slug = name.slice(2);
+      const [u, d, t] = await Promise.all([kv.get(name, 'json'), kv.get(`d:${slug}`, 'json'), kv.get(`t:${slug}`)]);
+      return u ? { ...resumo(slug, u, d, Number(t) || 0, sessoes[slug] || 0), admin: slug === eu } : null;
+    }));
+    return json({ usuarios: lista.filter(Boolean).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')) });
+  }
+
+  const m = rota.match(/^usuarios\/([a-z0-9-]+)(?:\/(pin|desbloquear|desconectar|ficha))?$/);
+  if (!m) return json({ erro: 'rota' }, 404);
+  const [, slug, acao] = m;
+  const u = await kv.get(`u:${slug}`, 'json');
+  if (!u) return json({ erro: 'nao-existe', mensagem: 'Usuário não encontrado.' }, 404);
+
+  if (!acao && metodo === 'GET') {
+    const [d, t, sessoes] = await Promise.all([kv.get(`d:${slug}`, 'json'), kv.get(`t:${slug}`), sessoesPor()]);
+    return json({ usuario: { ...resumo(slug, u, d, Number(t) || 0, sessoes[slug] || 0), admin: slug === eu }, rev: d?.rev || 0, dados: d?.dados || null });
+  }
+
+  if (acao === 'pin' && metodo === 'POST') {
+    const corpo = await lerCorpo(request);
+    const pin = String(corpo?.pin || '');
+    if (!/^\d{4}$/.test(pin)) return json({ erro: 'pin', mensagem: 'O PIN tem 4 números.' }, 400);
+    const salt = aleatorio(16);
+    await kv.put(`u:${slug}`, JSON.stringify({ ...u, salt, hash: await hashPin(pin, salt) }));
+    await kv.delete(`t:${slug}`);
+    const n = slug === eu ? 0 : await desconectar(kv, slug);
+    return json({ ok: true, desconectados: n });
+  }
+
+  if (acao === 'desbloquear' && metodo === 'POST') {
+    await kv.delete(`t:${slug}`);
+    return json({ ok: true });
+  }
+
+  if (acao === 'desconectar' && metodo === 'POST') {
+    if (slug === eu) return json({ erro: 'proprio', mensagem: 'Use "Sair" para desconectar a sua própria conta.' }, 400);
+    return json({ ok: true, desconectados: await desconectar(kv, slug) });
+  }
+
+  if (acao === 'ficha' && metodo === 'PUT') {
+    const corpo = await lerCorpo(request);
+    if (!corpo?.ficha?.treinos?.length) return json({ erro: 'ficha', mensagem: 'Ficha inválida.' }, 400);
+    const d = (await kv.get(`d:${slug}`, 'json')) || { rev: 0, dados: null };
+    const dados = { ...(d.dados || {}), ficha: corpo.ficha, fichaEm: Date.now() };
+    // treino em andamento de um treino que não existe mais na ficha nova é descartado
+    if (dados.sessao && !corpo.ficha.treinos.some((t) => t.id === dados.sessao.treinoId)) { dados.sessao = null; dados.sessaoEm = Date.now(); }
+    await kv.put(`d:${slug}`, JSON.stringify({ rev: d.rev + 1, dados, atualizadoEm: new Date().toISOString() }));
+    return json({ ok: true, rev: d.rev + 1 });
+  }
+
+  if (!acao && metodo === 'DELETE') {
+    if (slug === eu) return json({ erro: 'proprio', mensagem: 'Você não pode excluir a sua própria conta.' }, 400);
+    await desconectar(kv, slug);
+    await Promise.all([kv.delete(`u:${slug}`), kv.delete(`d:${slug}`), kv.delete(`t:${slug}`)]);
     return json({ ok: true });
   }
 
