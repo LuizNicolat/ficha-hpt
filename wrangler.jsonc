@@ -8,8 +8,10 @@
     "directory": "./docs",
     "binding": "ASSETS"
   },
-  // Senha do admin: NÃO fica aqui. Cadastre no Cloudflare como secret ADMIN_SENHA
-  // (Worker → Settings → Variables and Secrets).
+  // Senha do admin e chave do YouTube: NÃO ficam aqui. Cadastre no Cloudflare como Secret
+  // ADMIN_SENHA e YOUTUBE_API_KEY (Worker → Settings → Variables and Secrets).
+  // keep_vars: o deploy automático não apaga as variáveis cadastradas no painel.
+  "keep_vars": true,
   // Onde ficam os dados de cada usuário
   "kv_namespaces": [
     {
