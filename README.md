@@ -10,7 +10,7 @@ App de treino (PWA) que lê o PDF exportado do MFIT e monta a ficha: treinos A�
 - **Offline**: sem internet, tudo é salvo no aparelho e enviado quando a conexão volta. Se dois aparelhos mudarem ao mesmo tempo, o histórico dos dois é somado.
 - **Carregar treino**: a pessoa pode trocar a ficha dela pelo PDF dela. A ficha base continua igual para os outros.
 - **Ficha base nova**: quando `docs/treino.json` muda, quem segue a ficha base recebe um aviso e escolhe se atualiza.
-- **Admin**: quem está em `ADMINS` (no `wrangler.jsonc`) vê o botão Admin. Lá dá pra ver cada usuário (último treino, histórico, anotações), enviar a ficha base ou um PDF para alguém, definir novo PIN, desbloquear, desconectar dos aparelhos e excluir.
+- **Admin**: login separado, usuário `admin` + senha (secret `ADMIN_SENHA` no Cloudflare). Entra digitando "admin" no nome, pelo link "Entrar como admin" ou abrindo `/#admin`. Não usa a conta de treino nem trava o aparelho. Lá dá pra ver cada usuário (último treino, histórico, anotações), enviar a ficha base ou um PDF para alguém, definir novo PIN, desbloquear, desconectar dos aparelhos e excluir.
 - **Segurança do PIN**: guardado com PBKDF2 + salt; 5 erros bloqueiam o usuário por 15 minutos.
 
 ## Estrutura
@@ -32,7 +32,10 @@ O projeto no Cloudflare é um Worker conectado a este repo: cada push na `main` 
 
 1. Crie um KV: Storage & Databases → KV → Create namespace (`ficha-hpt`).
 2. Copie o ID do namespace e coloque em `wrangler.jsonc`, no campo `id` de `FICHA_KV`.
-3. Commit + push.
+3. Senha do admin: no Worker → Settings → Variables and Secrets → Add → tipo **Secret**, nome `ADMIN_SENHA`. A senha nunca vai para o repositório.
+4. Commit + push.
+
+Para rodar local, crie um `.dev.vars` (fora do git) com `ADMIN_SENHA=alguma-senha`.
 
 ## Rodando local
 

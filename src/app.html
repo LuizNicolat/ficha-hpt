@@ -147,6 +147,7 @@ textarea.json { width: 100%; min-height: 120px; font: 12px/1.4 ui-monospace, Men
 .json-box summary { cursor: pointer; padding: 4px 0; }
 .json-box[open] { display: grid; gap: 8px; }
 /* Admin */
+.link-admin { background: none; border: 0; color: var(--muted); font-size: 13px; text-decoration: underline; text-underline-offset: 3px; justify-self: start; padding: 4px 0; min-height: 32px; }
 .chip.alerta { background: var(--warn); color: var(--surface); }
 .treino-card.usuario { grid-template-columns: 44px 1fr auto; }
 .treino-card.usuario .letra { width: 44px; height: 44px; font-size: 22px; border-width: 2px; }
@@ -242,12 +243,17 @@ function mesclar(s, l) {
 }
 
 async function api(rota, opts = {}) {
+  const { admin: comoAdmin, ...resto } = opts;
+  const token = comoAdmin ? admAuth?.token : auth?.token;
   const r = await fetch(`/api/${rota}`, {
-    ...opts,
-    headers: { 'content-type': 'application/json', ...(auth?.token ? { authorization: `Bearer ${auth.token}` } : {}) },
+    ...resto,
+    headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) },
   });
   const corpo = await r.json().catch(() => ({}));
-  if (r.status === 401 && rota !== 'entrar') { encerrar('Sua sessão expirou. Entre de novo.'); throw new Error('sessao'); }
+  if (r.status === 401 && rota !== 'entrar' && rota !== 'admin/entrar') {
+    if (comoAdmin) admEncerrar('A sessão do admin expirou. Entre de novo.'); else encerrar('Sua sessão expirou. Entre de novo.');
+    throw new Error('sessao');
+  }
   return { status: r.status, ...corpo };
 }
 
@@ -296,7 +302,6 @@ async function puxar() {
     if (sujo) return enviar();
     const r = await api('dados');
     if (r.status !== 200) throw new Error();
-    if (!!r.admin !== !!auth.admin) { auth.admin = !!r.admin; gravarAuth(auth, lembrado()); if (view.tela === 'home') render(); }
     if (r.rev !== rev || !carregado) {
       const antes = JSON.stringify(coletar());
       rev = r.rev;
@@ -358,7 +363,7 @@ async function entrar(nome, pin, lembrar, criar) {
     return render();
   }
 
-  auth = { token: r.token, nome: r.nome, slug: r.slug, admin: !!r.admin };
+  auth = { token: r.token, nome: r.nome, slug: r.slug };
   gravarAuth(auth, lembrar);
   if (!dono) { dono = { slug: r.slug, nome: r.nome }; store.set('dono', dono); }
 
@@ -474,6 +479,7 @@ function renderLogin() {
       <label class="lembrar" for="lembrar"><input type="checkbox" id="lembrar" checked> Lembrar de mim neste aparelho</label>
       ${d.erro ? `<p class="msg-erro" role="alert">${esc(d.erro)}</p>` : ''}
       <button class="btn primary" type="submit" ${d.carregando ? 'disabled' : ''}>${d.carregando ? 'Entrando…' : 'Entrar'}</button>
+      <button class="link-admin" type="button" data-a="modo-admin">Entrar como admin</button>
       <p class="muted">${dono ? 'Este aparelho é seu. Suas cargas, anotações e histórico ficam salvos na sua conta e aparecem igual em qualquer aparelho em que você entrar.'
         : 'Primeira vez? Escolha um PIN de 4 números. Suas cargas, anotações e histórico ficam na sua conta e aparecem igual no celular e no computador.'}</p>
     </form>`;
@@ -481,6 +487,7 @@ function renderLogin() {
 }
 
 function render() {
+  if (modoAdmin) return !admAuth ? renderAdminLogin() : view.tela === 'admin-usuario' ? renderAdminUsuario() : renderAdmin();
   if (!auth) return renderLogin();
   if (!carregado && !plano) {
     $dock.hidden = true;
@@ -490,8 +497,6 @@ function render() {
   }
   if (view.tela === 'treino' && treino(view.id)) return renderTreino(treino(view.id));
   if (view.tela === 'historico') return renderHistorico();
-  if (view.tela === 'admin' && auth.admin) return renderAdmin();
-  if (view.tela === 'admin-usuario' && auth.admin) return renderAdminUsuario();
   view = { tela: 'home', dados: view.dados };
   renderHome();
 }
@@ -554,7 +559,6 @@ function renderHome() {
       <button class="btn" data-a="historico">Histórico${historico.length ? ` (${historico.length})` : ''}</button>
       <button class="btn" data-a="carregar">${ICON.upload} Carregar treino</button>
       <button class="btn ghost" data-a="dados">Conta</button>
-      ${auth.admin ? '<button class="btn ghost" data-a="admin">Admin</button>' : ''}
     </section>
     ${view.dados ? `<section class="painel">
       <div class="eyebrow">Conta</div>
@@ -712,13 +716,81 @@ function renderHistorico() {
 }
 
 // ---------- admin ----------
+// Login próprio ("admin" + senha), guardado à parte: não mexe na conta de treino nem trava o aparelho.
+const ADM_AUTH = 'ficha:admin-auth';
+let admAuth = (() => { try { return JSON.parse(localStorage.getItem(ADM_AUTH) || sessionStorage.getItem(ADM_AUTH) || 'null'); } catch { return null; } })();
+let modoAdmin = location.hash === '#admin';
+let admLogin = { erro: '', carregando: false };
 let adm = { lista: null, det: null, erro: '', carregando: false, pdfPara: null };
+
+function entrarModoAdmin() {
+  modoAdmin = true;
+  if (location.hash !== '#admin') history.replaceState(null, '', '#admin');
+  view = { tela: 'admin' };
+  $dock.hidden = true;
+  render();
+  window.scrollTo({ top: 0 });
+  if (admAuth) admCarregarLista();
+}
+function sairModoAdmin() {
+  modoAdmin = false;
+  history.replaceState(null, '', location.pathname);
+  view = { tela: 'home' };
+  render();
+  if (auth) puxar();
+}
+function admEncerrar(msg) {
+  admAuth = null;
+  try { localStorage.removeItem(ADM_AUTH); sessionStorage.removeItem(ADM_AUTH); } catch {}
+  admLogin = { erro: msg || '', carregando: false };
+  adm = { ...adm, lista: null, det: null };
+  view = { tela: 'admin' };
+  render();
+}
+async function admEntrar(senha, lembrar) {
+  admLogin = { erro: '', carregando: true };
+  render();
+  let r;
+  try { r = await api('admin/entrar', { method: 'POST', body: JSON.stringify({ senha, lembrar }) }); }
+  catch { admLogin = { erro: 'Sem conexão.', carregando: false }; return render(); }
+  if (r.status !== 200 || !r.token) {
+    admLogin = { erro: r.erro ? r.mensagem : `O servidor não respondeu (código ${r.status}).`, carregando: false };
+    return render();
+  }
+  admAuth = { token: r.token };
+  try { (lembrar ? localStorage : sessionStorage).setItem(ADM_AUTH, JSON.stringify(admAuth)); } catch {}
+  admLogin = { erro: '', carregando: false };
+  view = { tela: 'admin' };
+  admCarregarLista();
+}
+async function admSair() {
+  try { await api('sair', { method: 'POST', admin: true }); } catch {}
+  admEncerrar();
+  sairModoAdmin();
+}
+
+function renderAdminLogin() {
+  $dock.hidden = true;
+  $app.innerHTML = `
+    <header class="plano"><div class="eyebrow">Ficha de treino</div><h1>Admin</h1></header>
+    <form class="painel" id="form-admin" novalidate>
+      <label class="eyebrow" for="adm-usuario">Usuário</label>
+      <input class="campo" id="adm-usuario" value="admin" readonly autocomplete="username">
+      <label class="eyebrow" for="adm-senha">Senha</label>
+      <input class="campo" id="adm-senha" type="password" autocomplete="current-password" placeholder="Senha do admin">
+      <label class="lembrar" for="lembrar-adm"><input type="checkbox" id="lembrar-adm" checked> Lembrar neste aparelho por 30 dias</label>
+      ${admLogin.erro ? `<p class="msg-erro" role="alert">${esc(admLogin.erro)}</p>` : ''}
+      <button class="btn primary" type="submit" ${admLogin.carregando ? 'disabled' : ''}>${admLogin.carregando ? 'Entrando…' : 'Entrar'}</button>
+      <button class="btn ghost" type="button" data-a="sair-modo-admin">Voltar para o app</button>
+    </form>`;
+  document.getElementById('adm-senha').focus();
+}
 
 async function admCarregarLista() {
   adm = { ...adm, carregando: true, erro: '' };
   render();
   try {
-    const r = await api('admin/usuarios');
+    const r = await api('admin/usuarios', { admin: true });
     if (r.status !== 200) throw new Error(r.mensagem || 'Não consegui carregar os usuários.');
     adm.lista = r.usuarios;
   } catch (e) { if (e.message !== 'sessao') adm.erro = e.message; }
@@ -729,7 +801,7 @@ async function admCarregarUsuario(slug) {
   adm = { ...adm, det: adm.det?.usuario.slug === slug ? adm.det : null, carregando: true, erro: '' };
   render();
   try {
-    const r = await api(`admin/usuarios/${slug}`);
+    const r = await api(`admin/usuarios/${slug}`, { admin: true });
     if (r.status !== 200) throw new Error(r.mensagem || 'Não consegui carregar esse usuário.');
     adm.det = r;
   } catch (e) { if (e.message !== 'sessao') adm.erro = e.message; }
@@ -738,7 +810,7 @@ async function admCarregarUsuario(slug) {
 }
 async function admAcao(slug, acao, metodo, corpo, okMsg) {
   try {
-    const r = await api(`admin/usuarios/${slug}${acao ? '/' + acao : ''}`, { method: metodo, body: corpo ? JSON.stringify(corpo) : undefined });
+    const r = await api(`admin/usuarios/${slug}${acao ? '/' + acao : ''}`, { method: metodo, body: corpo ? JSON.stringify(corpo) : undefined, admin: true });
     if (r.status !== 200) throw new Error(r.mensagem || 'Não deu certo.');
     toast(typeof okMsg === 'function' ? okMsg(r) : okMsg);
     return r;
@@ -759,7 +831,7 @@ function renderAdmin() {
   $dock.hidden = true;
   const l = adm.lista;
   $app.innerHTML = `
-    <div class="spread"><button class="voltar" data-a="home">${ICON.back} Treinos</button><button class="btn small ghost" data-a="adm-atualizar">Atualizar</button></div>
+    <div class="spread"><button class="voltar" data-a="sair-modo-admin">${ICON.back} App</button><div class="row"><button class="btn small ghost" data-a="adm-atualizar">Atualizar</button><button class="btn small" data-a="adm-sair">Sair do admin</button></div></div>
     <header class="plano"><div class="eyebrow">Admin</div><h1>Usuários</h1>
       ${l ? `<div class="meta"><span>${l.length} ${l.length === 1 ? 'pessoa' : 'pessoas'}</span><span>${plural(l.reduce((a, u) => a + u.treinos, 0), 'treino registrado', 'treinos registrados')}</span></div>` : ''}
     </header>
@@ -848,7 +920,7 @@ function renderAdminUsuario() {
 async function admEnviarFicha(slug, ficha, origemTxt) {
   const r = await admAcao(slug, 'ficha', 'PUT', { ficha }, `Ficha ${origemTxt} enviada`);
   if (!r) return;
-  if (slug === auth.slug) puxar();   // a sua própria ficha: atualiza aqui também
+  if (slug === auth?.slug) puxar();   // a sua própria ficha: atualiza aqui também
   admCarregarUsuario(slug);
 }
 
@@ -899,6 +971,9 @@ $app.addEventListener('click', async (ev) => {
     if (!b.dataset.sure) { b.dataset.sure = '1'; b.textContent = 'Toque de novo para liberar'; return; }
     store.del('dono'); store.del(CACHE()); dono = null; sair();
   }
+  else if (a === 'modo-admin') entrarModoAdmin();
+  else if (a === 'sair-modo-admin') sairModoAdmin();
+  else if (a === 'adm-sair') admSair();
   else if (a === 'admin') { view = { tela: 'admin' }; render(); window.scrollTo({ top: 0 }); admCarregarLista(); }
   else if (a === 'adm-atualizar') admCarregarLista();
   else if (a === 'adm-abrir') { view = { tela: 'admin-usuario', slug: b.dataset.slug }; adm.det = null; render(); window.scrollTo({ top: 0 }); admCarregarUsuario(b.dataset.slug); }
@@ -971,11 +1046,21 @@ $app.addEventListener('click', async (ev) => {
 
 $app.addEventListener('submit', (ev) => {
   ev.preventDefault();
-  if (ev.target.id === 'form-entrar') {
+  if (ev.target.id === 'form-admin') {
+    const senha = document.getElementById('adm-senha').value;
+    if (!senha) { admLogin.erro = 'Digite a senha.'; return render(); }
+    admEntrar(senha, document.getElementById('lembrar-adm').checked);
+  } else if (ev.target.id === 'form-entrar') {
     const nome = document.getElementById('nome-login').value.trim();
     const pin = document.getElementById('pin-login').value.trim();
     const lembrar = document.getElementById('lembrar').checked;
     if (!nome) { login.erro = 'Digite seu nome.'; return render(); }
+    if (ehNomeAdmin(nome)) {   // "admin" no nome: o campo do PIN vira a senha do admin
+      if (!pin) { login = { ...login, nome, erro: 'Digite a senha do admin.' }; return render(); }
+      login = { etapa: 'form', erro: '', nome: '', carregando: false };
+      modoAdmin = true; history.replaceState(null, '', '#admin');
+      return admEntrar(pin, lembrar);
+    }
     if (!/^\d{4}$/.test(pin)) { login = { ...login, nome, erro: 'O PIN tem 4 números.' }; return render(); }
     entrar(nome, pin, lembrar, false);
   } else if (ev.target.id === 'form-adm-pin') {
@@ -991,8 +1076,19 @@ $app.addEventListener('submit', (ev) => {
   }
 });
 
+const ehNomeAdmin = (n) => n.trim().toLowerCase() === 'admin';
+function ajustarCampoSenha() {
+  const nome = document.getElementById('nome-login'), pin = document.getElementById('pin-login');
+  if (!nome || !pin || nome.type === 'hidden') return;
+  const adminAqui = ehNomeAdmin(nome.value);
+  if (adminAqui) { pin.removeAttribute('maxlength'); pin.removeAttribute('pattern'); pin.setAttribute('inputmode', 'text'); pin.placeholder = 'Senha do admin'; pin.classList.remove('pin'); }
+  else { pin.setAttribute('maxlength', '4'); pin.setAttribute('pattern', '[0-9]*'); pin.setAttribute('inputmode', 'numeric'); pin.placeholder = '••••'; pin.classList.add('pin'); }
+  document.querySelector('label[for="pin-login"]').textContent = adminAqui ? 'Senha' : 'PIN';
+}
+
 let timerNota = null;
 $app.addEventListener('input', (ev) => {
+  if (ev.target.id === 'nome-login') return ajustarCampoSenha();
   const nota = ev.target.closest('textarea[data-nota]');
   if (nota) {
     const v = nota.value.trim();
@@ -1043,6 +1139,11 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 window.addEventListener('online', () => (sujo ? enviar() : puxar()));
 setInterval(() => { if (sujo && !enviando) enviar(); }, 30000);
 
+window.addEventListener('hashchange', () => {
+  const quer = location.hash === '#admin';
+  if (quer !== modoAdmin) (quer ? entrarModoAdmin() : sairModoAdmin());
+});
+
 // ---------- início ----------
 function iniciar() {
   if (auth) {
@@ -1052,12 +1153,13 @@ function iniciar() {
       if (sujo) sync = 'salvando';
       if (sessao && treino(sessao.treinoId) && contagem(treino(sessao.treinoId)).ok > 0) view = { tela: 'treino', id: sessao.treinoId };
     }
-    render();
-    puxar();
   } else {
     login.nome = dono?.nome || '';
-    render();
   }
+  if (modoAdmin) view = { tela: 'admin' };
+  render();
+  if (auth) puxar();
+  if (modoAdmin && admAuth) admCarregarLista();
 }
 iniciar();
 </script>

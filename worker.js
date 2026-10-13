@@ -5,7 +5,8 @@
 // PUT  /api/dados    { rev, dados }                   -> { rev }  (409 + versão do servidor se rev estiver velho)
 // POST /api/sair
 //
-// Admin (slugs listados em ADMINS no wrangler.jsonc):
+// Admin: login próprio (usuário "admin" + senha do secret ADMIN_SENHA no Cloudflare):
+// POST   /api/admin/entrar                   { senha, lembrar } -> { token }
 // GET    /api/admin/usuarios                 lista com resumo
 // GET    /api/admin/usuarios/<slug>          dados completos
 // POST   /api/admin/usuarios/<slug>/pin      { pin }  novo PIN (desconecta os aparelhos)
@@ -51,7 +52,26 @@ async function lerCorpo(request) {
   try { return await request.json(); } catch { return null; }
 }
 
-const ehAdmin = (env, slug) => String(env.ADMINS || '').split(',').map((x) => x.trim()).filter(Boolean).includes(slug);
+// A sessão do admin é guardada como "@admin", um slug que nenhum nome de usuário consegue gerar.
+const ADMIN = '@admin';
+const sha = async (txt) => hex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(txt)));
+
+async function entrarAdmin(request, kv, env) {
+  if (!env.ADMIN_SENHA) return json({ erro: 'config', mensagem: 'A senha do admin ainda não foi cadastrada no Cloudflare (secret ADMIN_SENHA).' }, 500);
+  const corpo = await lerCorpo(request);
+  const tentativas = Number(await kv.get(`t:${ADMIN}`)) || 0;
+  if (tentativas >= MAX_TENTATIVAS) return json({ erro: 'bloqueado', mensagem: 'Muitas tentativas erradas. Tente de novo em 15 minutos.' }, 429);
+  if (!iguais(await sha(String(corpo?.senha || '')), await sha(env.ADMIN_SENHA))) {
+    const n = tentativas + 1;
+    await kv.put(`t:${ADMIN}`, String(n), { expirationTtl: 15 * 60 });
+    const restam = MAX_TENTATIVAS - n;
+    return json({ erro: 'senha', mensagem: restam > 0 ? `Senha errada. ${restam === 1 ? 'Resta 1 tentativa' : `Restam ${restam} tentativas`}.` : 'Muitas tentativas erradas. Tente de novo em 15 minutos.' }, restam > 0 ? 401 : 429);
+  }
+  if (tentativas) await kv.delete(`t:${ADMIN}`);
+  const token = aleatorio(32);
+  await kv.put(`s:${token}`, ADMIN, { expirationTtl: corpo?.lembrar ? 30 * DIA : DIA / 2, metadata: { slug: ADMIN } });
+  return json({ token });
+}
 
 async function usuarioDaSessao(request, kv) {
   const m = (request.headers.get('authorization') || '').match(/^Bearer ([a-f0-9]{64})$/);
@@ -65,6 +85,7 @@ async function entrar(request, kv, env) {
   const pin = String(corpo?.pin || '');
   const slug = slugify(nome);
   if (!slug) return json({ erro: 'nome', mensagem: 'Digite seu nome.' }, 400);
+  if (slug === 'admin') return json({ erro: 'admin', mensagem: 'Para entrar como admin, use a senha do admin.' }, 400);
   if (!/^\d{4}$/.test(pin)) return json({ erro: 'pin', mensagem: 'O PIN tem 4 números.' }, 400);
 
   const tentativas = Number(await kv.get(`t:${slug}`)) || 0;
@@ -92,7 +113,7 @@ async function entrar(request, kv, env) {
   const token = aleatorio(32);
   await kv.put(`s:${token}`, slug, { expirationTtl: corpo.lembrar ? 365 * DIA : DIA, metadata: { slug } });
   const registro = (await kv.get(`d:${slug}`, 'json')) || { rev: 0, dados: null };
-  return json({ token, nome: usuario.nome, slug, admin: ehAdmin(env, slug), rev: registro.rev, dados: registro.dados });
+  return json({ token, nome: usuario.nome, slug, rev: registro.rev, dados: registro.dados });
 }
 
 export default {
@@ -110,13 +131,16 @@ async function api(request, env, rota) {
   const metodo = request.method;
 
   if (rota === 'entrar' && metodo === 'POST') return entrar(request, kv, env);
+  if (rota === 'admin/entrar' && metodo === 'POST') return entrarAdmin(request, kv, env);
 
   const slug = await usuarioDaSessao(request, kv);
   if (!slug) return json({ erro: 'sessao', mensagem: 'Sua sessão expirou. Entre de novo.' }, 401);
 
+  if (slug === ADMIN && rota !== 'sair' && !rota.startsWith('admin/')) return json({ erro: 'proibido', mensagem: 'A conta admin não tem treinos.' }, 403);
+
   if (rota === 'dados' && metodo === 'GET') {
     const r = (await kv.get(`d:${slug}`, 'json')) || { rev: 0, dados: null };
-    return json({ rev: r.rev, dados: r.dados, admin: ehAdmin(env, slug) });
+    return json({ rev: r.rev, dados: r.dados });
   }
 
   if (rota === 'dados' && metodo === 'PUT') {
@@ -138,7 +162,7 @@ async function api(request, env, rota) {
   }
 
   if (rota.startsWith('admin/')) {
-    if (!ehAdmin(env, slug)) return json({ erro: 'proibido', mensagem: 'Só o administrador pode fazer isso.' }, 403);
+    if (slug !== ADMIN) return json({ erro: 'proibido', mensagem: 'Só o administrador pode fazer isso.' }, 403);
     return admin(request, kv, rota.slice(6), slug);
   }
 
