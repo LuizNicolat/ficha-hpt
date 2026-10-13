@@ -1,0 +1,1188 @@
+{
+  "versao": 1,
+  "importadoEm": "2026-10-13T00:46:21.045Z",
+  "aluno": "Luiz Nicolat",
+  "rotina": "Hpt",
+  "objetivo": "Redução de gordura/hipertrofia",
+  "nivel": "Intermediário",
+  "treinos": [
+    {
+      "id": "A",
+      "titulo": "Sup",
+      "exercicios": [
+        {
+          "id": "A1",
+          "nome": "Alongamento de Peitoral Espaldar",
+          "series": "2x 20 segundos",
+          "carga": "0kg",
+          "instrucoes": "",
+          "grupo": null,
+          "sets": [
+            {
+              "reps": "20 segundos",
+              "carga": ""
+            },
+            {
+              "reps": "20 segundos",
+              "carga": ""
+            }
+          ]
+        },
+        {
+          "id": "A2",
+          "nome": "mobilidade de ombro",
+          "series": "20 movimentos",
+          "carga": "0kg",
+          "instrucoes": "",
+          "grupo": null,
+          "sets": [
+            {
+              "reps": "20 movimentos",
+              "carga": ""
+            }
+          ]
+        },
+        {
+          "id": "A3",
+          "nome": "Manguito Rotador Externo",
+          "series": "2x 15 movimentos",
+          "carga": "18kg",
+          "instrucoes": "",
+          "grupo": null,
+          "sets": [
+            {
+              "reps": "15 movimentos",
+              "carga": "18"
+            },
+            {
+              "reps": "15 movimentos",
+              "carga": "18"
+            }
+          ]
+        },
+        {
+          "id": "A4",
+          "nome": "Desenvolvimento com Halteres Sentado",
+          "series": "1x 15,12,8,6 (Subindo carga)",
+          "carga": "17.5, 22.5, 27.5, 30",
+          "instrucoes": "",
+          "grupo": null,
+          "sets": [
+            {
+              "reps": "15",
+              "carga": "17.5"
+            },
+            {
+              "reps": "12",
+              "carga": "22.5"
+            },
+            {
+              "reps": "8",
+              "carga": "27.5"
+            },
+            {
+              "reps": "6",
+              "carga": "30"
+            }
+          ]
+        },
+        {
+          "id": "A5",
+          "nome": "Supino Inclinado com Halteres",
+          "series": "1x 12 + 3x 6 a 8",
+          "carga": "22, 32.5",
+          "instrucoes": "",
+          "grupo": null,
+          "sets": [
+            {
+              "reps": "12",
+              "carga": "22"
+            },
+            {
+              "reps": "6 a 8",
+              "carga": "32.5"
+            },
+            {
+              "reps": "6 a 8",
+              "carga": "32.5"
+            },
+            {
+              "reps": "6 a 8",
+              "carga": "32.5"
+            }
+          ]
+        },
+        {
+          "id": "A6",
+          "nome": "Supino Maquina (Pegada Pronada)",
+          "series": "3x 8 a 12",
+          "carga": "63kg",
+          "instrucoes": "",
+          "grupo": null,
+          "sets": [
+            {
+              "reps": "8 a 12",
+              "carga": "63"
+            },
+            {
+              "reps": "8 a 12",
+              "carga": "63"
+            },
+            {
+              "reps": "8 a 12",
+              "carga": "63"
+            }
+          ]
+        },
+        {
+          "id": "A7",
+          "nome": "Supino Máquina Inclinado (Pegada Pronada)",
+          "series": "3x 6 a 8",
+          "carga": "40kg",
+          "instrucoes": "",
+          "grupo": null,
+          "sets": [
+            {
+              "reps": "6 a 8",
+              "carga": "40"
+            },
+            {
+              "reps": "6 a 8",
+              "carga": "40"
+            },
+            {
+              "reps": "6 a 8",
+              "carga": "40"
+            }
+          ]
+        },
+        {
+          "id": "A8",
+          "nome": "Crossover Polia Alta",
+          "series": "3x 12 com 2 segundos de pico de contração",
+          "carga": "27kg",
+          "instrucoes": "",
+          "grupo": null,
+          "sets": [
+            {
+              "reps": "12",
+              "carga": "27"
+            },
+            {
+              "reps": "12",
+              "carga": "27"
+            },
+            {
+              "reps": "12",
+              "carga": "27"
+            }
+          ]
+        },
+        {
+          "id": "A9",
+          "nome": "Tríceps Francês Unilateral na Polia",
+          "series": "1x 10 + 3x 6 a 8",
+          "carga": "9, 23",
+          "instrucoes": "",
+          "grupo": null,
+          "sets": [
+            {
+              "reps": "10",
+              "carga": "9"
+            },
+            {
+              "reps": "6 a 8",
+              "carga": "23"
+            },
+            {
+              "reps": "6 a 8",
+              "carga": "23"
+            },
+            {
+              "reps": "6 a 8",
+              "carga": "23"
+            }
+          ]
+        },
+        {
+          "id": "A10",
+          "nome": "Elevação frontal na polia com banco inclinado",
+          "series": "3x 8 a 10",
+          "carga": "36kg",
+          "instrucoes": "",
+          "grupo": null,
+          "sets": [
+            {
+              "reps": "8 a 10",
+              "carga": "36"
+            },
+            {
+              "reps": "8 a 10",
+              "carga": "36"
+            },
+            {
+              "reps": "8 a 10",
+              "carga": "36"
+            }
+          ]
+        },
+        {
+          "id": "A11",
+          "nome": "Tríceps Testa no Banco Inclinado na Polia",
+          "series": "3x 6 a 8",
+          "carga": "0kg",
+          "instrucoes": "",
+          "grupo": null,
+          "sets": [
+            {
+              "reps": "6 a 8",
+              "carga": ""
+            },
+            {
+              "reps": "6 a 8",
+              "carga": ""
+            },
+            {
+              "reps": "6 a 8",
+              "carga": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "B",
+      "titulo": "Inf",
+      "exercicios": [
+        {
+          "id": "B1",
+          "nome": "Alongamento de Adutores I",
+          "series": "2x 20 segundos",
+          "carga": "0kg",
+          "instrucoes": "",
+          "grupo": null,
+          "sets": [
+            {
+              "reps": "20 segundos",
+              "carga": ""
+            },
+            {
+              "reps": "20 segundos",
+              "carga": ""
+            }
+          ]
+        },
+        {
+          "id": "B2",
+          "nome": "Mobilidade de Quadril IV",
+          "series": "2x 20 segundos",
+          "carga": "0kg",
+          "instrucoes": "",
+          "grupo": null,
+          "sets": [
+            {
+              "reps": "20 segundos",
+              "carga": ""
+            },
+            {
+              "reps": "20 segundos",
+              "carga": ""
+            }
+          ]
+        },
+        {
+          "id": "B3",
+          "nome": "Alongamento de Panturrilha Espaldar",
+          "series": "2x 20 segundos",
+          "carga": "0kg",
+          "instrucoes": "",
+          "grupo": null,
+          "sets": [
+            {
+              "reps": "20 segundos",
+              "carga": ""
+            },
+            {
+              "reps": "20 segundos",
+              "carga": ""
+            }
+          ]
+        },
+        {
+          "id": "B4",
+          "nome": "Descompressão de coluna sentado espaldar",
+          "series": "2x 20 segundos",
+          "carga": "0kg",
+          "instrucoes": "",
+          "grupo": null,
+          "sets": [
+            {
+              "reps": "20 segundos",
+              "carga": ""
+            },
+            {
+              "reps": "20 segundos",
+              "carga": ""
+            }
+          ]
+        },
+        {
+          "id": "B5",
+          "nome": "Adução de Quadril Máquina",
+          "series": "1x 15,12,10,8 (Subindo carga)",
+          "carga": "27, 45, 68, 95",
+          "instrucoes": "",
+          "grupo": null,
+          "sets": [
+            {
+              "reps": "15",
+              "carga": "27"
+            },
+            {
+              "reps": "12",
+              "carga": "45"
+            },
+            {
+              "reps": "10",
+              "carga": "68"
+            },
+            {
+              "reps": "8",
+              "carga": "95"
+            }
+          ]
+        },
+        {
+          "id": "B6",
+          "nome": "Sumo máquina cinto",
+          "series": "1x 12,10,8,8,6 (Subindo carga)",
+          "carga": "20-80",
+          "instrucoes": "Fazer com triângulo",
+          "grupo": null,
+          "sets": [
+            {
+              "reps": "12",
+              "carga": ""
+            },
+            {
+              "reps": "10",
+              "carga": ""
+            },
+            {
+              "reps": "8",
+              "carga": ""
+            },
+            {
+              "reps": "8",
+              "carga": ""
+            },
+            {
+              "reps": "6",
+              "carga": ""
+            }
+          ]
+        },
+        {
+          "id": "B7",
+          "nome": "Stiff pés afastados com Barra Livre",
+          "series": "1x 12 + 3x 6 a 8",
+          "carga": "40, 70",
+          "instrucoes": "",
+          "grupo": null,
+          "sets": [
+            {
+              "reps": "12",
+              "carga": "40"
+            },
+            {
+              "reps": "6 a 8",
+              "carga": "70"
+            },
+            {
+              "reps": "6 a 8",
+              "carga": "70"
+            },
+            {
+              "reps": "6 a 8",
+              "carga": "70"
+            }
+          ]
+        },
+        {
+          "id": "B8",
+          "nome": "Afundo Alternado no Smith",
+          "series": "2x 12 alternado, 2x 10 uni",
+          "carga": "20, 40",
+          "instrucoes": "2x alternando, 2x sem alternar",
+          "grupo": null,
+          "sets": [
+            {
+              "reps": "12 alternado",
+              "carga": "20"
+            },
+            {
+              "reps": "12 alternado",
+              "carga": "20"
+            },
+            {
+              "reps": "10 uni",
+              "carga": "40"
+            },
+            {
+              "reps": "10 uni",
+              "carga": "40"
+            }
+          ]
+        },
+        {
+          "id": "B9",
+          "nome": "Mesa Flexora Unilateral",
+          "series": "4x15",
+          "carga": "0kg",
+          "instrucoes": "",
+          "grupo": "B-g1",
+          "sets": [
+            {
+              "reps": "15",
+              "carga": ""
+            },
+            {
+              "reps": "15",
+              "carga": ""
+            },
+            {
+              "reps": "15",
+              "carga": ""
+            },
+            {
+              "reps": "15",
+              "carga": ""
+            }
+          ]
+        },
+        {
+          "id": "B10",
+          "nome": "Mesa Flexora",
+          "series": "4x 6 a 8",
+          "carga": "0kg",
+          "instrucoes": "",
+          "grupo": "B-g1",
+          "sets": [
+            {
+              "reps": "6 a 8",
+              "carga": ""
+            },
+            {
+              "reps": "6 a 8",
+              "carga": ""
+            },
+            {
+              "reps": "6 a 8",
+              "carga": ""
+            },
+            {
+              "reps": "6 a 8",
+              "carga": ""
+            }
+          ]
+        },
+        {
+          "id": "B11",
+          "nome": "Panturrilha no Leg Press Horizontal",
+          "series": "1x 10 + 3x 6 a 8",
+          "carga": "0kg",
+          "instrucoes": "",
+          "grupo": null,
+          "sets": [
+            {
+              "reps": "10",
+              "carga": ""
+            },
+            {
+              "reps": "6 a 8",
+              "carga": ""
+            },
+            {
+              "reps": "6 a 8",
+              "carga": ""
+            },
+            {
+              "reps": "6 a 8",
+              "carga": ""
+            }
+          ]
+        },
+        {
+          "id": "B12",
+          "nome": "Abdominal Supra com Corda na Polia no Chão",
+          "series": "1x 10 + 3x 6 a 8",
+          "carga": "0kg",
+          "instrucoes": "",
+          "grupo": null,
+          "sets": [
+            {
+              "reps": "10",
+              "carga": ""
+            },
+            {
+              "reps": "6 a 8",
+              "carga": ""
+            },
+            {
+              "reps": "6 a 8",
+              "carga": ""
+            },
+            {
+              "reps": "6 a 8",
+              "carga": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "C",
+      "titulo": "Sup",
+      "exercicios": [
+        {
+          "id": "C1",
+          "nome": "Descompressão de coluna sentado espaldar",
+          "series": "3x 20 segundos",
+          "carga": "0kg",
+          "instrucoes": "",
+          "grupo": null,
+          "sets": [
+            {
+              "reps": "20 segundos",
+              "carga": ""
+            },
+            {
+              "reps": "20 segundos",
+              "carga": ""
+            },
+            {
+              "reps": "20 segundos",
+              "carga": ""
+            }
+          ]
+        },
+        {
+          "id": "C2",
+          "nome": "Pulldown com Corda",
+          "series": "1x 15,12,10,8,6 (Subindo carga)",
+          "carga": "23, 32, 41, 50, 54",
+          "instrucoes": "",
+          "grupo": null,
+          "sets": [
+            {
+              "reps": "15",
+              "carga": "23"
+            },
+            {
+              "reps": "12",
+              "carga": "32"
+            },
+            {
+              "reps": "10",
+              "carga": "41"
+            },
+            {
+              "reps": "8",
+              "carga": "50"
+            },
+            {
+              "reps": "6",
+              "carga": "54"
+            }
+          ]
+        },
+        {
+          "id": "C3",
+          "nome": "Face Pull",
+          "series": "3x 8 a 12",
+          "carga": "50kg",
+          "instrucoes": "",
+          "grupo": null,
+          "sets": [
+            {
+              "reps": "8 a 12",
+              "carga": "50"
+            },
+            {
+              "reps": "8 a 12",
+              "carga": "50"
+            },
+            {
+              "reps": "8 a 12",
+              "carga": "50"
+            }
+          ]
+        },
+        {
+          "id": "C4",
+          "nome": "Remada Baixa (Pegada Pronada)",
+          "series": "1x 10 + 3x 6 a 8",
+          "carga": "23, 63",
+          "instrucoes": "",
+          "grupo": null,
+          "sets": [
+            {
+              "reps": "10",
+              "carga": "23"
+            },
+            {
+              "reps": "6 a 8",
+              "carga": "63"
+            },
+            {
+              "reps": "6 a 8",
+              "carga": "63"
+            },
+            {
+              "reps": "6 a 8",
+              "carga": "63"
+            }
+          ]
+        },
+        {
+          "id": "C5",
+          "nome": "Puxada Neutra barra H",
+          "series": "1x 10 + 3x 6 a 8",
+          "carga": "23, 50",
+          "instrucoes": "",
+          "grupo": null,
+          "sets": [
+            {
+              "reps": "10",
+              "carga": "23"
+            },
+            {
+              "reps": "6 a 8",
+              "carga": "50"
+            },
+            {
+              "reps": "6 a 8",
+              "carga": "50"
+            },
+            {
+              "reps": "6 a 8",
+              "carga": "50"
+            }
+          ]
+        },
+        {
+          "id": "C6",
+          "nome": "Remada máquina supinada Smart",
+          "series": "1x 10 + 3x 6 a 8",
+          "carga": "10, 30",
+          "instrucoes": "Fazer na polia baixa, com barra anatômica",
+          "grupo": null,
+          "sets": [
+            {
+              "reps": "10",
+              "carga": "10"
+            },
+            {
+              "reps": "6 a 8",
+              "carga": "30"
+            },
+            {
+              "reps": "6 a 8",
+              "carga": "30"
+            },
+            {
+              "reps": "6 a 8",
+              "carga": "30"
+            }
+          ]
+        },
+        {
+          "id": "C7",
+          "nome": "Remada Alta Sentado na Polia Alta Com Corda",
+          "series": "3x 6 a 8",
+          "carga": "68kg",
+          "instrucoes": "Faz com banco e travar com step",
+          "grupo": "C-g1",
+          "sets": [
+            {
+              "reps": "6 a 8",
+              "carga": "68"
+            },
+            {
+              "reps": "6 a 8",
+              "carga": "68"
+            },
+            {
+              "reps": "6 a 8",
+              "carga": "68"
+            }
+          ]
+        },
+        {
+          "id": "C8",
+          "nome": "Pulldown com Corda",
+          "series": "12 movimentos",
+          "carga": "0kg",
+          "instrucoes": "",
+          "grupo": "C-g1",
+          "sets": [
+            {
+              "reps": "12 movimentos",
+              "carga": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "D",
+      "titulo": "Sup",
+      "exercicios": [
+        {
+          "id": "D1",
+          "nome": "Elevação lateral máquina",
+          "series": "2x 15 + 3x 6 a 8",
+          "carga": "23, 77",
+          "instrucoes": "",
+          "grupo": null,
+          "sets": [
+            {
+              "reps": "15",
+              "carga": "23"
+            },
+            {
+              "reps": "15",
+              "carga": "23"
+            },
+            {
+              "reps": "6 a 8",
+              "carga": "77"
+            },
+            {
+              "reps": "6 a 8",
+              "carga": "77"
+            },
+            {
+              "reps": "6 a 8",
+              "carga": "77"
+            }
+          ]
+        },
+        {
+          "id": "D2",
+          "nome": "Desenvolvimento com Halteres Sentado",
+          "series": "1x12 + 3x 6 a 8",
+          "carga": "15, 25",
+          "instrucoes": "",
+          "grupo": null,
+          "sets": [
+            {
+              "reps": "12",
+              "carga": "15"
+            },
+            {
+              "reps": "6 a 8",
+              "carga": "25"
+            },
+            {
+              "reps": "6 a 8",
+              "carga": "25"
+            },
+            {
+              "reps": "6 a 8",
+              "carga": "25"
+            }
+          ]
+        },
+        {
+          "id": "D3",
+          "nome": "Crossover Polia Baixa",
+          "series": "3x 8 a 12 com 2 segundos de pico de contração",
+          "carga": "23kg",
+          "instrucoes": "",
+          "grupo": null,
+          "sets": [
+            {
+              "reps": "8 a 12",
+              "carga": "23"
+            },
+            {
+              "reps": "8 a 12",
+              "carga": "23"
+            },
+            {
+              "reps": "8 a 12",
+              "carga": "23"
+            }
+          ]
+        },
+        {
+          "id": "D4",
+          "nome": "Supino Máquina Inclinado (Pegada Pronada)",
+          "series": "3x 6 a 8",
+          "carga": "45,50",
+          "instrucoes": "",
+          "grupo": null,
+          "sets": [
+            {
+              "reps": "6 a 8",
+              "carga": "45"
+            },
+            {
+              "reps": "6 a 8",
+              "carga": "50"
+            },
+            {
+              "reps": "6 a 8",
+              "carga": "50"
+            }
+          ]
+        },
+        {
+          "id": "D5",
+          "nome": "Rosca Direta Barra W",
+          "series": "1x10,8,6 (Subindo carga)",
+          "carga": "0kg",
+          "instrucoes": "",
+          "grupo": null,
+          "sets": [
+            {
+              "reps": "10",
+              "carga": ""
+            },
+            {
+              "reps": "8",
+              "carga": ""
+            },
+            {
+              "reps": "6",
+              "carga": ""
+            }
+          ]
+        },
+        {
+          "id": "D6",
+          "nome": "Rosca Martelo Alternada com Halteres",
+          "series": "3x 6 a 8",
+          "carga": "0kg",
+          "instrucoes": "",
+          "grupo": null,
+          "sets": [
+            {
+              "reps": "6 a 8",
+              "carga": ""
+            },
+            {
+              "reps": "6 a 8",
+              "carga": ""
+            },
+            {
+              "reps": "6 a 8",
+              "carga": ""
+            }
+          ]
+        },
+        {
+          "id": "D7",
+          "nome": "Remada alta na polia com banco inclinado",
+          "series": "3x 6 a 8",
+          "carga": "54kg",
+          "instrucoes": "",
+          "grupo": null,
+          "sets": [
+            {
+              "reps": "6 a 8",
+              "carga": "54"
+            },
+            {
+              "reps": "6 a 8",
+              "carga": "54"
+            },
+            {
+              "reps": "6 a 8",
+              "carga": "54"
+            }
+          ]
+        },
+        {
+          "id": "D8",
+          "nome": "Elevação frontal na polia com banco inclinado",
+          "series": "3x 6 a 8",
+          "carga": "23kg",
+          "instrucoes": "",
+          "grupo": null,
+          "sets": [
+            {
+              "reps": "6 a 8",
+              "carga": "23"
+            },
+            {
+              "reps": "6 a 8",
+              "carga": "23"
+            },
+            {
+              "reps": "6 a 8",
+              "carga": "23"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E",
+      "titulo": "Inf",
+      "exercicios": [
+        {
+          "id": "E1",
+          "nome": "Mobilidade de Quadril IV",
+          "series": "2x 20 segundos",
+          "carga": "0kg",
+          "instrucoes": "",
+          "grupo": null,
+          "sets": [
+            {
+              "reps": "20 segundos",
+              "carga": ""
+            },
+            {
+              "reps": "20 segundos",
+              "carga": ""
+            }
+          ]
+        },
+        {
+          "id": "E2",
+          "nome": "Alongamento de Adutores I",
+          "series": "2x 20 segundos",
+          "carga": "0kg",
+          "instrucoes": "",
+          "grupo": null,
+          "sets": [
+            {
+              "reps": "20 segundos",
+              "carga": ""
+            },
+            {
+              "reps": "20 segundos",
+              "carga": ""
+            }
+          ]
+        },
+        {
+          "id": "E3",
+          "nome": "Descompressão de coluna sentado espaldar",
+          "series": "2x 20 segundos",
+          "carga": "0kg",
+          "instrucoes": "",
+          "grupo": null,
+          "sets": [
+            {
+              "reps": "20 segundos",
+              "carga": ""
+            },
+            {
+              "reps": "20 segundos",
+              "carga": ""
+            }
+          ]
+        },
+        {
+          "id": "E4",
+          "nome": "Agachamento Livre com Barra no Suporte",
+          "series": "1x 15,10,8,6,6 (Subindo carga)",
+          "carga": "10,20,30,40",
+          "instrucoes": "",
+          "grupo": null,
+          "sets": [
+            {
+              "reps": "15",
+              "carga": "10"
+            },
+            {
+              "reps": "10",
+              "carga": "20"
+            },
+            {
+              "reps": "8",
+              "carga": "30"
+            },
+            {
+              "reps": "6",
+              "carga": "40"
+            },
+            {
+              "reps": "6",
+              "carga": "40"
+            }
+          ]
+        },
+        {
+          "id": "E5",
+          "nome": "Cadeira Extensora",
+          "series": "1x 12 + 3x 6 a 8",
+          "carga": "23, max",
+          "instrucoes": "",
+          "grupo": null,
+          "sets": [
+            {
+              "reps": "12",
+              "carga": "23"
+            },
+            {
+              "reps": "6 a 8",
+              "carga": ""
+            },
+            {
+              "reps": "6 a 8",
+              "carga": ""
+            },
+            {
+              "reps": "6 a 8",
+              "carga": ""
+            }
+          ]
+        },
+        {
+          "id": "E6",
+          "nome": "Leg Press Horizontal Unilateral",
+          "series": "3x 8 a 10",
+          "carga": "32kg",
+          "instrucoes": "",
+          "grupo": null,
+          "sets": [
+            {
+              "reps": "8 a 10",
+              "carga": "32"
+            },
+            {
+              "reps": "8 a 10",
+              "carga": "32"
+            },
+            {
+              "reps": "8 a 10",
+              "carga": "32"
+            }
+          ]
+        },
+        {
+          "id": "E7",
+          "nome": "Elevação de quadril na maquina",
+          "series": "1x 12 + 3x 6 a 8",
+          "carga": "40, 160",
+          "instrucoes": "",
+          "grupo": null,
+          "sets": [
+            {
+              "reps": "12",
+              "carga": "40"
+            },
+            {
+              "reps": "6 a 8",
+              "carga": "160"
+            },
+            {
+              "reps": "6 a 8",
+              "carga": "160"
+            },
+            {
+              "reps": "6 a 8",
+              "carga": "160"
+            }
+          ]
+        },
+        {
+          "id": "E8",
+          "nome": "Cadeira Flexora",
+          "series": "3x 6 a 8",
+          "carga": "0kg",
+          "instrucoes": "",
+          "grupo": null,
+          "sets": [
+            {
+              "reps": "6 a 8",
+              "carga": ""
+            },
+            {
+              "reps": "6 a 8",
+              "carga": ""
+            },
+            {
+              "reps": "6 a 8",
+              "carga": ""
+            }
+          ]
+        },
+        {
+          "id": "E9",
+          "nome": "Abdominal Supra com Corda na Polia no Chão",
+          "series": "1x 10 + 3x 6 a 8",
+          "carga": "0kg",
+          "instrucoes": "",
+          "grupo": null,
+          "sets": [
+            {
+              "reps": "10",
+              "carga": ""
+            },
+            {
+              "reps": "6 a 8",
+              "carga": ""
+            },
+            {
+              "reps": "6 a 8",
+              "carga": ""
+            },
+            {
+              "reps": "6 a 8",
+              "carga": ""
+            }
+          ]
+        },
+        {
+          "id": "E10",
+          "nome": "Abdominal Infra no Banco Declinado com Pernas Flexionadas Elevação de Quadril",
+          "series": "3x falha",
+          "carga": "0kg",
+          "instrucoes": "",
+          "grupo": null,
+          "sets": [
+            {
+              "reps": "falha",
+              "carga": ""
+            },
+            {
+              "reps": "falha",
+              "carga": ""
+            },
+            {
+              "reps": "falha",
+              "carga": ""
+            }
+          ]
+        },
+        {
+          "id": "E11",
+          "nome": "Abdominal Prancha Isométrica",
+          "series": "3x max",
+          "carga": "0kg",
+          "instrucoes": "",
+          "grupo": null,
+          "sets": [
+            {
+              "reps": "max",
+              "carga": ""
+            },
+            {
+              "reps": "max",
+              "carga": ""
+            },
+            {
+              "reps": "max",
+              "carga": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

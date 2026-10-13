@@ -1,0 +1,23 @@
+# Opcional: ao dar push de um treino.pdf novo, gera docs/treino.json e commita.
+name: Gerar treino.json
+on:
+  push:
+    paths: ['treino.pdf']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  gerar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm ci
+      - run: node gerar-json.mjs treino.pdf docs/treino.json
+      - run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add docs/treino.json
+          git diff --cached --quiet || git commit -m "Atualiza treino.json"
+          git push

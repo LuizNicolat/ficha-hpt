@@ -1,0 +1,3 @@
+{ "name": "treinos-app", "private": true, "type": "module",
+  "scripts": { "gerar": "node gerar-json.mjs treino.pdf docs/treino.json", "build": "node build.mjs" },
+  "devDependencies": { "pdfjs-dist": "4.10.38" } }

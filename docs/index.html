@@ -1,0 +1,756 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1d58c9">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}[hidden]{display:none!important}img{max-width:100%}</style>
+<title>Ficha Hpt</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Figtree:wght@400;500;600&display=swap">
+<style>
+/* Layout: coluna única de celular (máx. 560px). Ficha de academia: letras grandes condensadas
+   como etiqueta de anilha, séries em linhas tabulares, barra de descanso fixa embaixo. */
+:root {
+  --bg: #e9ecef;
+  --surface: #f8f9fa;
+  --ink: #141a21;
+  --muted: #5b6672;
+  --line: #d3d8de;
+  --accent: #1d58c9;      /* azul de anilha de 20 kg */
+  --accent-ink: #ffffff;
+  --accent-soft: #dbe5f8;
+  --done: #1f8a4c;
+  --done-soft: #d9efe1;
+  --warn: #b5541c;
+  --font-display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --font-body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --r: 10px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1318; --surface: #181e25; --ink: #e8ecf0; --muted: #94a0ad; --line: #2a333d;
+    --accent: #5b8ff0; --accent-ink: #0b1220; --accent-soft: #1b2a45;
+    --done: #45c07a; --done-soft: #16301f; --warn: #e48a52; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1318; --surface: #181e25; --ink: #e8ecf0; --muted: #94a0ad; --line: #2a333d;
+  --accent: #5b8ff0; --accent-ink: #0b1220; --accent-soft: #1b2a45;
+  --done: #45c07a; --done-soft: #16301f; --warn: #e48a52; color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.45; margin: 0; }
+#app { max-width: 560px; margin: 0 auto; padding-inline: 16px; padding-block: 16px 140px; display: grid; gap: 16px; }
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.num { font-variant-numeric: tabular-nums; }
+.eyebrow { font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+h1, h2, h3 { font-family: var(--font-display); font-weight: 700; margin: 0; line-height: 1.05; text-wrap: balance; }
+h1 { font-size: 34px; letter-spacing: .01em; }
+h2 { font-size: 22px; }
+.muted { color: var(--muted); }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 10px 16px; font-weight: 600; min-height: 44px; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.ghost { background: transparent; }
+.btn.danger { color: var(--warn); border-color: currentColor; background: transparent; }
+.btn.small { min-height: 34px; padding: 6px 12px; font-size: 13.5px; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.spread { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.icon { width: 18px; height: 18px; flex: none; }
+
+/* Cabeçalho do plano */
+.plano { display: grid; gap: 6px; padding-top: 8px; }
+.plano .meta { display: flex; flex-wrap: wrap; gap: 6px 14px; color: var(--muted); font-size: 13.5px; }
+
+/* Lista de treinos */
+.treinos { display: grid; gap: 10px; }
+.treino-card { display: grid; grid-template-columns: 64px 1fr auto; gap: 14px; align-items: center; text-align: left; width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px 12px 12px; }
+.letra { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; font-family: var(--font-display); font-weight: 700; font-size: 34px; background: var(--bg); border: 3px solid var(--ink); }
+.treino-card.proximo .letra { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.treino-card .nome { font-family: var(--font-display); font-size: 21px; font-weight: 600; }
+.treino-card .resumo { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.treino-card .info { min-width: 0; display: grid; gap: 2px; }
+.chip { display: inline-block; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; padding: 3px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); white-space: nowrap; }
+.chip.ok { background: var(--done-soft); color: var(--done); }
+.chev { color: var(--muted); }
+
+/* Painel de importação / dados */
+.painel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; display: grid; gap: 12px; }
+.painel p { margin: 0; font-size: 14px; }
+.aviso { border-color: var(--accent); background: var(--accent-soft); }
+.erro { border-color: var(--warn); color: var(--warn); }
+.preview-list { margin: 0; padding-left: 18px; font-size: 14px; }
+
+/* Tela do treino */
+.topo { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); margin-inline: -16px; padding: 10px 16px; border-bottom: 1px solid var(--line); display: grid; gap: 8px; }
+.barra { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.barra > i { display: block; height: 100%; background: var(--done); transition: width .25s; }
+.voltar { border: 0; background: none; padding: 6px 4px; display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-weight: 600; min-height: 40px; }
+
+.ex { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; display: grid; gap: 10px; }
+.ex.completo { border-color: var(--done); }
+.ex h3 { font-size: 20px; font-weight: 600; }
+.ex .prescricao { font-size: 13.5px; color: var(--muted); display: grid; gap: 2px; }
+.ex .prescricao b { color: var(--ink); font-weight: 600; }
+.instr { font-size: 13.5px; background: var(--bg); border-radius: 8px; padding: 8px 10px; }
+.grupo { border: 2px dashed var(--accent); border-radius: calc(var(--r) + 4px); padding: 10px; display: grid; gap: 10px; }
+.grupo-tag { display: flex; align-items: center; gap: 8px; color: var(--accent); font-weight: 600; font-size: 13.5px; }
+
+.sets { display: grid; gap: 6px; }
+.set { display: grid; grid-template-columns: 26px 1fr 112px 44px; gap: 8px; align-items: center; padding: 4px 0; }
+.set .n { font-family: var(--font-display); font-weight: 700; font-size: 18px; color: var(--muted); text-align: center; }
+.set .alvo { font-weight: 600; font-variant-numeric: tabular-nums; min-width: 0; }
+.set .alvo small { display: block; font-weight: 400; color: var(--muted); font-size: 12px; }
+.kg { display: flex; align-items: center; gap: 4px; border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; background: var(--bg); height: 40px; }
+.kg input { width: 100%; border: 0; background: none; font-variant-numeric: tabular-nums; font-weight: 600; font-size: 16px; min-width: 0; outline: none; }
+.kg:focus-within { border-color: var(--accent); }
+.kg span { color: var(--muted); font-size: 13px; }
+.chk { width: 44px; height: 40px; border-radius: 8px; border: 1.5px solid var(--line); background: var(--bg); display: grid; place-items: center; color: var(--muted); }
+.set.feito .chk { background: var(--done); border-color: var(--done); color: #fff; }
+.set.feito .alvo, .set.feito .n { color: var(--done); }
+
+/* Descanso */
+.dock { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; background: var(--surface); border-top: 1px solid var(--line); padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px)); }
+.dock-in { max-width: 560px; margin: 0 auto; display: grid; gap: 8px; }
+.descanso { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
+.relogio { font-family: var(--font-display); font-weight: 700; font-size: 30px; font-variant-numeric: tabular-nums; line-height: 1; }
+.descanso.ativo .relogio { color: var(--accent); }
+.descanso.fim .relogio { color: var(--done); }
+
+/* Histórico */
+.sessao { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); }
+.sessao summary { list-style: none; padding: 12px 14px; cursor: pointer; display: grid; grid-template-columns: 44px 1fr auto; gap: 12px; align-items: center; }
+.sessao summary::-webkit-details-marker { display: none; }
+.sessao .letra { width: 44px; height: 44px; font-size: 22px; border-width: 2px; }
+.sessao .corpo { padding: 0 14px 14px; display: grid; gap: 8px; font-size: 14px; }
+.sessao .linha { display: grid; grid-template-columns: 1fr auto; gap: 8px; border-top: 1px solid var(--line); padding-top: 8px; }
+.sessao .linha span:last-child { font-variant-numeric: tabular-nums; color: var(--muted); text-align: right; }
+
+.toast { position: fixed; left: 50%; bottom: calc(96px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-weight: 600; font-size: 14px; z-index: 20; max-width: calc(100% - 32px); }
+textarea.json { width: 100%; min-height: 120px; font: 12px/1.4 ui-monospace, Menlo, monospace; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+</head>
+<body>
+<main id="app" aria-live="polite"></main>
+<div class="dock" id="dock" hidden></div>
+<div class="toast" id="toast" hidden></div>
+<input type="file" id="arquivo-pdf" accept="application/pdf,.pdf" hidden>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
+<script type="module">
+// Parser do PDF exportado pelo MFIT.
+// Funciona no navegador e no Node: recebe o objeto `pdfjs` (pdfjs-dist) e os bytes do PDF.
+//
+// Layout do PDF (uma página por treino):
+//   cabeçalho: Nome / "Rotina: X" / objetivo / nível
+//   título do treino (fonte grande): "Sup", "Inf"...
+//   cartões: nome do exercício (fonte de título) + "Séries: ..." + "Carga: ..." [+ "Instruções: ..."]
+//   "Exercícios combinados" / "Alterne esses exercícios" abre um bloco de bi-set.
+
+const LETRAS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+// Ligaduras que alguns PDFs perdem (glifo vira \u0000) ou mandam como caractere especial.
+const LIGADURAS = { 'ﬀ': 'ff', 'ﬁ': 'fi', 'ﬂ': 'fl', 'ﬃ': 'ffi', 'ﬄ': 'ffl', '\u0000': 'ff' };
+
+function limpa(s) {
+  return s.replace(/[ﬀ-ﬄ\u0000]/g, (c) => LIGADURAS[c] || '')
+    .replace(/[-]/g, '') // ícones (área de uso privado)
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Agrupa os itens de texto em linhas (mesmo y), ordenados por x, inserindo espaço só onde há folga.
+function montaLinhas(items) {
+  const linhas = [];
+  for (const it of items) {
+    if (!it.str) continue;
+    const y = it.transform[5], x = it.transform[4];
+    let l = linhas.find((l) => Math.abs(l.y - y) < 2);
+    if (!l) linhas.push((l = { y, partes: [] }));
+    l.partes.push({ x, w: it.width, s: it.str, fonte: it.fontName, h: it.height });
+  }
+  linhas.sort((a, b) => b.y - a.y);
+  for (const l of linhas) {
+    l.partes.sort((a, b) => a.x - b.x);
+    let txt = '', fim = null;
+    for (const p of l.partes) {
+      if (fim !== null && p.x - fim > 1.5 && !txt.endsWith(' ') && !p.s.startsWith(' ')) txt += ' ';
+      txt += p.s;
+      fim = p.x + p.w;
+    }
+    l.texto = limpa(txt);
+    l.x = l.partes[0].x;
+    l.fontes = new Set(l.partes.filter((p) => limpa(p.s)).map((p) => p.fonte));
+    l.altura = Math.max(...l.partes.map((p) => p.h));
+  }
+  return linhas.filter((l) => l.texto);
+}
+
+const ROTULO = /^(Séries|Series|Carga|Instruções|Instrucoes)\s*:\s*(.*)$/i;
+
+function parsePagina(linhas) {
+  const iRotina = linhas.findIndex((l) => /^Rotina\s*:/i.test(l.texto));
+  const cab = {
+    aluno: iRotina > 0 ? linhas[iRotina - 1].texto : '',
+    rotina: iRotina >= 0 ? linhas[iRotina].texto.replace(/^Rotina\s*:\s*/i, '') : '',
+    objetivo: linhas[iRotina + 1]?.texto || '',
+    nivel: linhas[iRotina + 2]?.texto || '',
+  };
+  let corpo = linhas.slice(iRotina + 3);
+  const titulo = corpo.shift()?.texto || 'Treino';
+
+  // A fonte dos nomes de exercício é a da linha imediatamente acima do primeiro "Séries:".
+  const iSeries = corpo.findIndex((l) => /^S[ée]ries\s*:/i.test(l.texto));
+  const fonteNome = iSeries > 0 ? [...corpo[iSeries - 1].fontes][0] : null;
+  // Ligaduras ("fi", "ff") às vezes vêm em outra fonte, então basta a primeira parte da linha estar na fonte de nome.
+  const ehNome = (l) => fonteNome && l.partes.find((p) => limpa(p.s))?.fonte === fonteNome && !ROTULO.test(l.texto);
+
+  const exercicios = [];
+  let atual = null, campo = null;
+
+  const fecha = () => { if (atual) exercicios.push(atual); atual = null; campo = null; };
+
+  for (const l of corpo) {
+    if (/^Exerc[íi]cios combinados$/i.test(l.texto)) {
+      fecha();
+      continue;
+    }
+    if (/^Alterne esses exerc[íi]cios$/i.test(l.texto)) continue;
+
+    const m = l.texto.match(ROTULO);
+    if (m && atual) {
+      const k = m[1].toLowerCase();
+      campo = k.startsWith('s') ? 'series' : k.startsWith('c') ? 'carga' : 'instrucoes';
+      atual[campo] = m[2];
+      continue;
+    }
+    if (ehNome(l)) {
+      // Nome que quebrou em duas linhas: ainda não tem "Séries".
+      if (atual && !atual.series && campo === null) { atual.nome += ' ' + l.texto; continue; }
+      fecha();
+      atual = { nome: l.texto, series: '', carga: '', instrucoes: '', y: l.y };
+      continue;
+    }
+    if (atual && campo) atual[campo] = (atual[campo] + ' ' + l.texto).trim(); // continuação de linha
+  }
+  fecha();
+  return { cab, titulo, exercicios };
+}
+
+// Bloco "Exercícios combinados": pega os 2 exercícios seguintes e estende enquanto a
+// distância entre nomes for a mesma de dentro do bloco (cartões colados no mesmo quadro).
+function parsePaginaComGrupos(linhas) {
+  const iCombo = linhas.filter((l) => /^Exerc[íi]cios combinados$/i.test(l.texto)).map((l) => l.y);
+  const r = parsePagina(linhas);
+  iCombo.forEach((yCombo, gi) => {
+    const id = 'g' + (gi + 1);
+    const depois = r.exercicios.filter((e) => e.y < yCombo);
+    if (depois.length < 2) { depois.forEach((e) => (e.grupo = id)); return; }
+    const passo = depois[0].y - depois[1].y;
+    const membros = [depois[0], depois[1]];
+    for (let i = 2; i < depois.length; i++) {
+      const p = depois[i - 1].y - depois[i].y;
+      if (Math.abs(p - passo) < 0.8) membros.push(depois[i]); else break;
+    }
+    membros.forEach((e) => (e.grupo = id));
+  });
+  return r;
+}
+
+// "1x 12 + 3x 6 a 8" -> [{reps:'12'}, {reps:'6 a 8'} x3]; "1x 15,12,8,6" -> 4 séries
+function expandeSeries(series, carga) {
+  const partes = series.split(/\+|,(?=\s*\d+\s*x)/i).map((s) => s.trim()).filter(Boolean);
+  const sets = [];
+  const porParte = [];
+  for (const p of partes) {
+    const m = p.match(/^(\d+)\s*x\s*(.*)$/i);
+    const ini = sets.length;
+    if (!m) sets.push({ reps: p });
+    else {
+      const n = +m[1];
+      // "12 com 2 segundos de pico de contração" -> "12" (o texto completo continua em `series`)
+      const resto = m[2].trim().replace(/\s+com\s.*$/i, '');
+      const lista = resto.match(/^(\d+(?:\s*,\s*\d+)+)(.*)$/);
+      if (n === 1 && lista) lista[1].split(',').forEach((r) => sets.push({ reps: r.trim() }));
+      else for (let i = 0; i < Math.min(n, 12); i++) sets.push({ reps: resto || '—' });
+    }
+    porParte.push([ini, sets.length]);
+  }
+  if (!sets.length) sets.push({ reps: series || '—' });
+
+  // Cargas sugeridas: uma por série, ou uma por parte ("22, 32.5" para "1x 12 + 3x 6 a 8").
+  const cargas = carga.replace(/kg/gi, '').split(',').map((c) => c.trim()).filter(Boolean);
+  const num = (c) => (/^\d+(\.\d+)?$/.test(c) && +c > 0 ? c : '');
+  if (cargas.length === sets.length) sets.forEach((s, i) => (s.carga = num(cargas[i])));
+  else if (cargas.length === porParte.length) porParte.forEach(([a, b], i) => { for (let k = a; k < b; k++) sets[k].carga = num(cargas[i]); });
+  else if (cargas.length === 1) sets.forEach((s) => (s.carga = num(cargas[0])));
+  // Menos cargas que séries ("45,50" em 3 séries): segue em ordem e repete a última.
+  else sets.forEach((s, i) => (s.carga = num(cargas[Math.min(i, cargas.length - 1)] || '')));
+  return sets;
+}
+
+async function parseMfitPdf(pdfjs, bytes) {
+  const doc = await pdfjs.getDocument({ data: bytes }).promise;
+  const treinos = [];
+  let cab = null;
+  for (let p = 1; p <= doc.numPages; p++) {
+    const page = await doc.getPage(p);
+    const tc = await page.getTextContent();
+    const linhas = montaLinhas(tc.items);
+    if (!linhas.some((l) => /^S[ée]ries\s*:/i.test(l.texto))) continue;
+    const r = parsePaginaComGrupos(linhas);
+    cab = cab || r.cab;
+    const letra = LETRAS[treinos.length] || String(treinos.length + 1);
+    treinos.push({
+      id: letra,
+      titulo: r.titulo.charAt(0).toUpperCase() + r.titulo.slice(1),
+      exercicios: r.exercicios.map((e, i) => ({
+        id: `${letra}${i + 1}`,
+        nome: e.nome,
+        series: e.series,
+        carga: e.carga,
+        instrucoes: e.instrucoes || '',
+        grupo: e.grupo ? `${letra}-${e.grupo}` : null,
+        sets: expandeSeries(e.series, e.carga),
+      })),
+    });
+  }
+  if (!treinos.length) throw new Error('Não encontrei exercícios nesse PDF. É o PDF exportado do MFIT?');
+  return { versao: 1, importadoEm: new Date().toISOString(), ...cab, treinos };
+}
+
+
+// ---------- armazenamento local ----------
+const PFX = 'ficha:';
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(PFX + k); return v ? JSON.parse(v) : d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(PFX + k, JSON.stringify(v)); } catch {} },
+  del(k) { try { localStorage.removeItem(PFX + k); } catch {} },
+};
+
+let plano = store.get('plano', null);
+let historico = store.get('historico', []);
+let ultimas = store.get('ultimas', {});   // cargas usadas por exercício (nome normalizado) e série
+let sessao = store.get('sessao', null);   // treino em andamento
+let descansoSeg = store.get('descanso', 90);
+let view = { tela: 'home' };
+let pendente = null;                      // plano lido do PDF esperando confirmação
+let erroImport = '';
+
+const $app = document.getElementById('app');
+const $dock = document.getElementById('dock');
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const norm = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+const dataBR = (iso) => new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+const diaBR = (iso) => new Date(iso).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' });
+const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.max(0, s) % 60).padStart(2, '0')}`;
+
+const ICON = {
+  check: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+  chev: '<svg class="icon chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>',
+  back: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M15 6l-6 6 6 6"/></svg>',
+  upload: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg>',
+  swap: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4L3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"/></svg>',
+};
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.hidden = false;
+  clearTimeout(toast._t); toast._t = setTimeout(() => (t.hidden = true), 2600);
+}
+
+// ---------- dados derivados ----------
+const treino = (id) => plano?.treinos.find((t) => t.id === id);
+function ultimoDe(id) { return historico.find((h) => h.treinoId === id); }
+function proximoId() {
+  if (!plano) return null;
+  const ult = historico[0];
+  if (!ult) return plano.treinos[0].id;
+  const i = plano.treinos.findIndex((t) => t.id === ult.treinoId);
+  return plano.treinos[(i + 1) % plano.treinos.length].id;
+}
+// Cargas lembradas por treino + nome (+ ocorrência), já que o mesmo exercício
+// pode aparecer em treinos diferentes com cargas diferentes.
+function chaveEx(ex) {
+  const t = plano.treinos.find((t) => t.exercicios.includes(ex));
+  const iguais = t.exercicios.filter((e) => norm(e.nome) === norm(ex.nome));
+  return `${t.id}|${norm(ex.nome)}|${iguais.indexOf(ex)}`;
+}
+function cargaInicial(ex, i) {
+  const s = sessao?.cargas?.[ex.id]?.[i];
+  if (s !== undefined) return s;
+  const u = ultimas[chaveEx(ex)]?.[i];
+  if (u) return u;
+  return ex.sets[i]?.carga || '';
+}
+const feito = (ex, i) => !!sessao?.feitos?.[ex.id]?.[i];
+function contagem(t) {
+  let total = 0, ok = 0;
+  for (const ex of t.exercicios) ex.sets.forEach((_, i) => { total++; if (feito(ex, i)) ok++; });
+  return { total, ok };
+}
+
+// ---------- telas ----------
+function render() {
+  if (view.tela === 'treino' && treino(view.id)) return renderTreino(treino(view.id));
+  if (view.tela === 'historico') return renderHistorico();
+  view = { tela: 'home' };
+  renderHome();
+}
+
+function painelImport() {
+  if (pendente) {
+    const n = pendente.treinos.reduce((a, t) => a + t.exercicios.length, 0);
+    return `<section class="painel aviso">
+      <div class="eyebrow">${pendente.origem === 'repo' ? 'Ficha nova disponível' : 'PDF lido'}</div>
+      <p><b>${esc(pendente.aluno)}</b> · Rotina ${esc(pendente.rotina)} · ${pendente.treinos.length} treinos, ${n} exercícios</p>
+      <ul class="preview-list">${pendente.treinos.map((t) => `<li>Treino ${t.id} (${esc(t.titulo)}): ${t.exercicios.length} exercícios</li>`).join('')}</ul>
+      <p class="muted">Isso substitui a ficha atual. O histórico e as cargas que você já registrou continuam.</p>
+      <div class="row"><button class="btn primary" data-a="confirmar-import">Usar esta ficha</button><button class="btn ghost" data-a="cancelar-import">Cancelar</button></div>
+    </section>`;
+  }
+  if (erroImport) return `<section class="painel erro"><p>${esc(erroImport)}</p></section>`;
+  return '';
+}
+
+function renderHome() {
+  $dock.hidden = true;
+  if (!plano) {
+    $app.innerHTML = `
+      <header class="plano"><div class="eyebrow">Ficha de treino</div><h1>Carregue sua ficha</h1></header>
+      ${painelImport()}
+      <section class="painel">
+        <p>Exporte o treino completo em PDF no MFIT e carregue aqui. O app separa os treinos, as séries e as cargas sozinho, e tudo fica salvo neste aparelho.</p>
+        <div class="row"><button class="btn primary" data-a="carregar">${ICON.upload} Carregar treino</button></div>
+      </section>`;
+    return;
+  }
+  const prox = proximoId();
+  const emAndamento = sessao && treino(sessao.treinoId) && contagem(treino(sessao.treinoId)).ok > 0 ? sessao.treinoId : null;
+  $app.innerHTML = `
+    <header class="plano">
+      <div class="eyebrow">Rotina ${esc(plano.rotina)}</div>
+      <h1>${esc(plano.aluno || 'Minha ficha')}</h1>
+      <div class="meta"><span>${esc(plano.objetivo)}</span><span>${esc(plano.nivel)}</span><span>${plano.treinos.length} treinos</span></div>
+    </header>
+    ${painelImport()}
+    <section class="treinos" aria-label="Treinos">
+      ${plano.treinos.map((t) => {
+        const u = ultimoDe(t.id);
+        const chip = t.id === emAndamento ? '<span class="chip">Em andamento</span>'
+          : t.id === prox ? '<span class="chip">Próximo</span>'
+          : u ? `<span class="chip ok">Feito ${dataBR(u.fim)}</span>` : '';
+        return `<button class="treino-card ${t.id === prox && !emAndamento ? 'proximo' : ''}" data-a="abrir" data-id="${t.id}">
+          <span class="letra" aria-hidden="true">${t.id}</span>
+          <span class="info">
+            <span class="row"><span class="nome">Treino ${t.id} · ${esc(t.titulo)}</span>${chip}</span>
+            <span class="resumo">${t.exercicios.length} exercícios · ${esc(t.exercicios.filter((e) => !/along|mobilid|descompress/i.test(e.nome)).slice(0, 3).map((e) => e.nome).join(', '))}</span>
+          </span>
+          ${ICON.chev}
+        </button>`;
+      }).join('')}
+    </section>
+    <section class="row">
+      <button class="btn" data-a="historico">Histórico${historico.length ? ` (${historico.length})` : ''}</button>
+      <button class="btn" data-a="carregar">${ICON.upload} Carregar treino</button>
+      <button class="btn ghost" data-a="dados">Dados</button>
+    </section>
+    ${view.dados ? `<section class="painel">
+      <div class="eyebrow">Ficha em JSON</div>
+      <p>Para compartilhar pelo GitHub: salve isso como <b>treino.json</b> no repositório. Quem abrir o app sem ficha carregada recebe essa automaticamente.</p>
+      <textarea class="json" id="json-ficha" readonly>${esc(JSON.stringify(plano, null, 2))}</textarea>
+      <div class="row"><button class="btn small" data-a="copiar-json">Copiar JSON</button><button class="btn small" data-a="baixar-json">Baixar treino.json</button></div>
+      <p class="muted">Importada em ${diaBR(plano.importadoEm)}.</p>
+    </section>` : ''}`;
+}
+
+function setRow(ex, i) {
+  const s = ex.sets[i];
+  const ok = feito(ex, i);
+  const val = cargaInicial(ex, i);
+  const sug = s.carga && s.carga !== val ? `ficha: ${s.carga} kg` : '';
+  return `<div class="set ${ok ? 'feito' : ''}">
+    <span class="n num">${i + 1}</span>
+    <span class="alvo">${esc(s.reps)}${sug ? `<small>${esc(sug)}</small>` : ''}</span>
+    <label class="kg"><input id="kg-${ex.id}-${i}" inputmode="decimal" autocomplete="off" aria-label="Carga da série ${i + 1}" placeholder="—" value="${esc(val)}" data-ex="${ex.id}" data-i="${i}"><span>kg</span></label>
+    <button class="chk" data-a="set" data-ex="${ex.id}" data-i="${i}" aria-pressed="${ok}" aria-label="Marcar série ${i + 1}">${ICON.check}</button>
+  </div>`;
+}
+
+function exCard(ex) {
+  const completo = ex.sets.every((_, i) => feito(ex, i));
+  return `<article class="ex ${completo ? 'completo' : ''}" id="ex-${ex.id}">
+    <h3>${esc(ex.nome)}</h3>
+    <div class="prescricao"><span><b>Séries:</b> ${esc(ex.series)}</span><span><b>Carga:</b> ${esc(ex.carga)}</span></div>
+    ${ex.instrucoes ? `<div class="instr">${esc(ex.instrucoes)}</div>` : ''}
+    <div class="sets">${ex.sets.map((_, i) => setRow(ex, i)).join('')}</div>
+  </article>`;
+}
+
+function renderTreino(t) {
+  const conflito = sessao && sessao.treinoId !== t.id && treino(sessao.treinoId) && contagem(treino(sessao.treinoId)).ok > 0;
+  if (!conflito && (!sessao || sessao.treinoId !== t.id)) {
+    sessao = { treinoId: t.id, inicio: new Date().toISOString(), feitos: {}, cargas: {} };
+    store.set('sessao', sessao);
+  }
+  const { total, ok } = conflito ? { total: 0, ok: 0 } : contagem(t);
+
+  // agrupa exercícios combinados em sequência
+  const blocos = [];
+  for (const ex of t.exercicios) {
+    const last = blocos[blocos.length - 1];
+    if (ex.grupo && last?.grupo === ex.grupo) last.itens.push(ex);
+    else blocos.push({ grupo: ex.grupo, itens: [ex] });
+  }
+
+  $app.innerHTML = `
+    <div class="topo">
+      <div class="spread">
+        <button class="voltar" data-a="home">${ICON.back} Treinos</button>
+        <span class="eyebrow num">${ok}/${total} séries</span>
+      </div>
+      <h1>Treino ${t.id} · ${esc(t.titulo)}</h1>
+      <div class="barra" role="progressbar" aria-valuemin="0" aria-valuemax="${total}" aria-valuenow="${ok}"><i style="width:${total ? (ok / total) * 100 : 0}%"></i></div>
+    </div>
+    ${conflito ? `<section class="painel aviso">
+      <p>O Treino ${sessao.treinoId} ainda está em andamento (${contagem(treino(sessao.treinoId)).ok} séries marcadas).</p>
+      <div class="row"><button class="btn primary" data-a="abrir" data-id="${sessao.treinoId}">Voltar ao Treino ${sessao.treinoId}</button><button class="btn danger" data-a="descartar" data-id="${t.id}">Descartar e começar o ${t.id}</button></div>
+    </section>` : blocos.map((b) => b.grupo
+      ? `<section class="grupo"><div class="grupo-tag">${ICON.swap} Exercícios combinados · alterne entre eles</div>${b.itens.map(exCard).join('')}</section>`
+      : exCard(b.itens[0])).join('')}
+    ${conflito ? '' : `<section class="row">
+      ${view.confirmaFim
+        ? `<button class="btn primary" data-a="finalizar" data-confirma="1">Salvar com ${ok} de ${total} séries</button><button class="btn ghost" data-a="cancelar-fim">Continuar treinando</button>`
+        : `<button class="btn primary" data-a="finalizar">Finalizar treino</button>`}
+      <button class="btn danger" data-a="descartar" data-id="${t.id}">Descartar</button>
+    </section>`}`;
+  renderDock(conflito);
+}
+
+// ---------- descanso ----------
+let fimDescanso = 0, tick = null;
+function renderDock(oculto) {
+  if (oculto || view.tela !== 'treino') { $dock.hidden = true; return; }
+  $dock.hidden = false;
+  const rest = Math.ceil((fimDescanso - Date.now()) / 1000);
+  const ativo = fimDescanso && rest > 0;
+  const acabou = fimDescanso && rest <= 0;
+  $dock.innerHTML = `<div class="dock-in">
+    <div class="descanso ${ativo ? 'ativo' : acabou ? 'fim' : ''}">
+      <div><div class="eyebrow">${ativo ? 'Descanso' : acabou ? 'Bora, próxima série' : 'Descanso entre séries'}</div>
+        <div class="relogio" id="relogio">${ativo ? mmss(rest) : mmss(descansoSeg)}</div></div>
+      <div class="row">
+        ${ativo ? `<button class="btn small" data-a="desc-mais">+15s</button><button class="btn small" data-a="desc-parar">Pular</button>`
+          : `<button class="btn small" data-a="desc-tempo" aria-label="Mudar tempo de descanso">${descansoSeg}s</button><button class="btn small primary" data-a="desc-iniciar">Iniciar</button>`}
+      </div>
+    </div></div>`;
+}
+function iniciarDescanso() {
+  fimDescanso = Date.now() + descansoSeg * 1000;
+  clearInterval(tick);
+  tick = setInterval(() => {
+    const rest = Math.ceil((fimDescanso - Date.now()) / 1000);
+    const el = document.getElementById('relogio');
+    if (rest <= 0) {
+      clearInterval(tick);
+      try { navigator.vibrate?.([200, 100, 200]); } catch {}
+      bip();
+      renderDock();
+    } else if (el) el.textContent = mmss(rest);
+  }, 250);
+  renderDock();
+}
+let audio;
+function bip() {
+  try {
+    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    const o = audio.createOscillator(), g = audio.createGain();
+    o.frequency.value = 880; g.gain.value = 0.15;
+    o.connect(g).connect(audio.destination); o.start(); o.stop(audio.currentTime + 0.35);
+  } catch {}
+}
+
+// mantém a tela ligada durante o treino quando o navegador deixa
+let wake = null;
+async function telaLigada(on) {
+  try {
+    if (on && !wake && navigator.wakeLock) wake = await navigator.wakeLock.request('screen');
+    if (!on && wake) { await wake.release(); wake = null; }
+  } catch { wake = null; }
+}
+
+// ---------- histórico ----------
+function renderHistorico() {
+  $dock.hidden = true;
+  $app.innerHTML = `
+    <div class="spread"><button class="voltar" data-a="home">${ICON.back} Treinos</button></div>
+    <header class="plano"><div class="eyebrow">${historico.length} treinos registrados</div><h1>Histórico</h1></header>
+    ${historico.length ? historico.map((h) => {
+      const min = Math.round((new Date(h.fim) - new Date(h.inicio)) / 60000);
+      const series = h.exercicios.reduce((a, e) => a + e.sets.filter((s) => s.feito).length, 0);
+      return `<details class="sessao"><summary>
+          <span class="letra" aria-hidden="true">${esc(h.treinoId)}</span>
+          <span><b>Treino ${esc(h.treinoId)} · ${esc(h.titulo)}</b><br><span class="muted num">${diaBR(h.fim)} · ${min} min · ${series} séries</span></span>
+          ${ICON.chev}
+        </summary>
+        <div class="corpo">${h.exercicios.map((e) => `<div class="linha"><span>${esc(e.nome)}</span><span>${e.sets.filter((s) => s.feito).map((s) => (s.carga ? s.carga : '–')).join(' · ')} kg</span></div>`).join('')}</div>
+      </details>`;
+    }).join('') : '<section class="painel"><p>Quando você finalizar um treino, ele aparece aqui com as cargas de cada série.</p></section>'}`;
+}
+
+// ---------- ações ----------
+function salvarSessao() { store.set('sessao', sessao); }
+
+function finalizar() {
+  const t = treino(sessao.treinoId);
+  const entrada = {
+    treinoId: t.id, titulo: t.titulo, inicio: sessao.inicio, fim: new Date().toISOString(),
+    exercicios: t.exercicios.map((ex) => ({
+      nome: ex.nome,
+      sets: ex.sets.map((s, i) => ({ alvo: s.reps, carga: String(cargaInicial(ex, i) || ''), feito: feito(ex, i) })),
+    })).filter((e) => e.sets.some((s) => s.feito)),
+  };
+  for (const ex of t.exercicios) {
+    const usadas = ex.sets.map((_, i) => (feito(ex, i) ? String(cargaInicial(ex, i) || '') : ultimas[chaveEx(ex)]?.[i] || ''));
+    if (usadas.some(Boolean)) ultimas[chaveEx(ex)] = usadas;
+  }
+  historico.unshift(entrada);
+  store.set('historico', historico); store.set('ultimas', ultimas);
+  sessao = null; store.del('sessao');
+  fimDescanso = 0; clearInterval(tick); telaLigada(false);
+  view = { tela: 'home' };
+  render();
+  toast(`Treino ${t.id} salvo no histórico`);
+}
+
+async function lerPdf(file) {
+  erroImport = ''; pendente = null;
+  try {
+    if (!window.pdfjsLib) throw new Error('Não consegui carregar o leitor de PDF. Confira a internet e tente de novo.');
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    pendente = await parseMfitPdf(window.pdfjsLib, bytes);
+  } catch (e) {
+    erroImport = e.message || 'Não consegui ler esse PDF.';
+  }
+  view = { tela: 'home' };
+  render();
+  window.scrollTo({ top: 0 });
+}
+
+$app.addEventListener('click', async (ev) => {
+  const b = ev.target.closest('[data-a]');
+  if (!b) return;
+  const a = b.dataset.a;
+  if (a === 'carregar') document.getElementById('arquivo-pdf').click();
+  else if (a === 'confirmar-import') {
+    plano = pendente; pendente = null; store.set('plano', plano);
+    if (sessao && !treino(sessao.treinoId)) { sessao = null; store.del('sessao'); }
+    render(); toast('Ficha atualizada');
+  } else if (a === 'cancelar-import') {
+    if (pendente?.origem === 'repo') store.set('repoIgnorado', pendente.importadoEm);
+    pendente = null; erroImport = ''; render();
+  }
+  else if (a === 'abrir') { view = { tela: 'treino', id: b.dataset.id }; render(); window.scrollTo({ top: 0 }); telaLigada(true); }
+  else if (a === 'home') { view = { tela: 'home' }; telaLigada(false); render(); window.scrollTo({ top: 0 }); }
+  else if (a === 'historico') { view = { tela: 'historico' }; render(); window.scrollTo({ top: 0 }); }
+  else if (a === 'dados') { view = { tela: 'home', dados: !view.dados }; render(); }
+  else if (a === 'copiar-json') {
+    const ta = document.getElementById('json-ficha');
+    try { await navigator.clipboard.writeText(ta.value); toast('JSON copiado'); }
+    catch { ta.select(); toast('Selecionei o texto, é só copiar'); }
+  } else if (a === 'baixar-json') {
+    const url = URL.createObjectURL(new Blob([JSON.stringify(plano, null, 2)], { type: 'application/json' }));
+    const l = Object.assign(document.createElement('a'), { href: url, download: 'treino.json' });
+    l.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } else if (a === 'set') {
+    const { ex, i } = b.dataset;
+    sessao.feitos[ex] = sessao.feitos[ex] || [];
+    const agora = !sessao.feitos[ex][i];
+    sessao.feitos[ex][i] = agora;
+    // guarda a carga que está no campo no momento da marcação
+    const inp = document.getElementById(`kg-${ex}-${i}`);
+    sessao.cargas[ex] = sessao.cargas[ex] || [];
+    sessao.cargas[ex][i] = inp.value.trim().replace(',', '.');
+    salvarSessao();
+    const y = window.scrollY;
+    view.confirmaFim = false;
+    render(); window.scrollTo({ top: y });
+    if (agora) iniciarDescanso();
+  } else if (a === 'finalizar') {
+    const { ok, total } = contagem(treino(sessao.treinoId));
+    if (!ok) { toast('Marque pelo menos uma série antes de finalizar'); return; }
+    if (ok < total && !b.dataset.confirma) { view.confirmaFim = true; render(); return; }
+    finalizar();
+  } else if (a === 'cancelar-fim') { view.confirmaFim = false; render(); }
+  else if (a === 'descartar') {
+    if (!b.dataset.sure) { b.dataset.sure = '1'; b.textContent = 'Toque de novo para descartar'; return; }
+    sessao = null; store.del('sessao'); fimDescanso = 0; clearInterval(tick);
+    view = { tela: 'treino', id: b.dataset.id }; render(); toast('Séries descartadas');
+  }
+});
+
+$app.addEventListener('input', (ev) => {
+  const inp = ev.target.closest('input[data-ex]');
+  if (!inp || !sessao) return;
+  const { ex, i } = inp.dataset;
+  sessao.cargas[ex] = sessao.cargas[ex] || [];
+  sessao.cargas[ex][i] = inp.value.trim().replace(',', '.');
+  salvarSessao();
+});
+
+$dock.addEventListener('click', (ev) => {
+  const b = ev.target.closest('[data-a]');
+  if (!b) return;
+  const a = b.dataset.a;
+  if (a === 'desc-iniciar') iniciarDescanso();
+  else if (a === 'desc-parar') { fimDescanso = 0; clearInterval(tick); renderDock(); }
+  else if (a === 'desc-mais') { fimDescanso += 15000; }
+  else if (a === 'desc-tempo') {
+    const op = [60, 90, 120, 180];
+    descansoSeg = op[(op.indexOf(descansoSeg) + 1) % op.length];
+    store.set('descanso', descansoSeg); renderDock();
+  }
+});
+
+document.getElementById('arquivo-pdf').addEventListener('change', (ev) => {
+  const f = ev.target.files[0];
+  ev.target.value = '';
+  if (f) lerPdf(f);
+});
+
+// ---------- início ----------
+async function iniciar() {
+  // Modo repositório: um treino.json publicado junto com o app vira a ficha inicial,
+  // e quem segue a ficha do repo é avisado quando ela muda.
+  try {
+    const r = await fetch('treino.json', { cache: 'no-store' });
+    if (r.ok) {
+      const doRepo = { ...(await r.json()), origem: 'repo' };
+      if (!plano) { plano = doRepo; store.set('plano', plano); }
+      else if (plano.origem === 'repo' && doRepo.importadoEm !== plano.importadoEm && store.get('repoIgnorado') !== doRepo.importadoEm) pendente = doRepo;
+    }
+  } catch {}
+  if (sessao && treino(sessao.treinoId) && contagem(treino(sessao.treinoId)).ok > 0) view = { tela: 'treino', id: sessao.treinoId };
+  render();
+}
+iniciar();
+</script>
+
+<script>
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>
