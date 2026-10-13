@@ -176,5 +176,7 @@ export async function parseMfitPdf(pdfjs, bytes) {
     });
   }
   if (!treinos.length) throw new Error('Não encontrei exercícios nesse PDF. É o PDF exportado do MFIT?');
-  return { versao: 1, importadoEm: new Date().toISOString(), ...cab, treinos };
+  // O nome do aluno fica de fora: no app aparece o nome de quem entrou.
+  const { aluno, ...resto } = cab;
+  return { versao: 1, importadoEm: new Date().toISOString(), ...resto, treinos };
 }

@@ -4,6 +4,8 @@ App de treino (PWA) que lê o PDF exportado do MFIT e monta a ficha: treinos A�
 
 ## Como funciona
 
+- **Perfis**: ao abrir, a pessoa escolhe o perfil ou entra com o nome. Histórico, cargas e treino em andamento são de cada perfil (dá pra dividir o mesmo celular). A ficha é a mesma para todos e não guarda o nome do aluno do PDF.
+
 - **Carregar treino**: escolhe o PDF do MFIT, o app lê no próprio navegador (pdf.js) e mostra um resumo antes de substituir a ficha.
 - **Durante o treino**: cada série tem o alvo de reps, a carga (pré-preenchida com a última que você usou, ou a da ficha) e um botão de concluir. Concluir dispara o descanso (60/90/120/180 s).
 - **Histórico**: cada treino finalizado fica salvo com as cargas por série.

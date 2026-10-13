@@ -80,6 +80,10 @@ h2 { font-size: 22px; }
 .treino-card .nome { font-family: var(--font-display); font-size: 21px; font-weight: 600; }
 .treino-card .resumo { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .treino-card .info { min-width: 0; display: grid; gap: 2px; }
+.treino-card.perfil { grid-template-columns: 44px 1fr auto; }
+.treino-card.perfil .letra { width: 44px; height: 44px; font-size: 22px; border-width: 2px; }
+.campo { width: 100%; height: 48px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); padding: 0 12px; font-size: 17px; }
+.campo:focus { border-color: var(--accent); outline: none; }
 .chip { display: inline-block; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; padding: 3px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); white-space: nowrap; }
 .chip.ok { background: var(--done-soft); color: var(--done); }
 .chev { color: var(--muted); }
@@ -329,7 +333,9 @@ async function parseMfitPdf(pdfjs, bytes) {
     });
   }
   if (!treinos.length) throw new Error('Não encontrei exercícios nesse PDF. É o PDF exportado do MFIT?');
-  return { versao: 1, importadoEm: new Date().toISOString(), ...cab, treinos };
+  // O nome do aluno fica de fora: no app aparece o nome de quem entrou.
+  const { aluno, ...resto } = cab;
+  return { versao: 1, importadoEm: new Date().toISOString(), ...resto, treinos };
 }
 
 
@@ -341,11 +347,55 @@ const store = {
   del(k) { try { localStorage.removeItem(PFX + k); } catch {} },
 };
 
+// A ficha é a mesma para todos; histórico, cargas, treino em andamento e descanso são de cada perfil.
 let plano = store.get('plano', null);
-let historico = store.get('historico', []);
-let ultimas = store.get('ultimas', {});   // cargas usadas por exercício (nome normalizado) e série
-let sessao = store.get('sessao', null);   // treino em andamento
-let descansoSeg = store.get('descanso', 90);
+let perfis = store.get('perfis', []);       // [{ id, nome }]
+let perfilId = store.get('perfilAtual', null);
+const perfil = () => perfis.find((p) => p.id === perfilId);
+const pk = (k) => `p:${perfilId}:${k}`;
+
+let historico = [];
+let ultimas = {};   // cargas usadas por exercício e série
+let sessao = null;  // treino em andamento
+let descansoSeg = 90;
+function carregarPerfil() {
+  historico = store.get(pk('historico'), []);
+  ultimas = store.get(pk('ultimas'), {});
+  sessao = store.get(pk('sessao'), null);
+  descansoSeg = store.get(pk('descanso'), 90);
+}
+if (!perfil()) perfilId = null; else carregarPerfil();
+
+function entrar(nome) {
+  nome = nome.trim().replace(/\s+/g, ' ').slice(0, 30);
+  if (!nome) return;
+  let p = perfis.find((x) => x.nome.toLowerCase() === nome.toLowerCase());
+  if (!p) {
+    p = { id: Date.now().toString(36), nome };
+    // Dados da versão sem perfis passam para o primeiro perfil criado.
+    if (!perfis.length) {
+      for (const k of ['historico', 'ultimas', 'sessao', 'descanso']) {
+        const antigo = store.get(k, null);
+        if (antigo !== null) { store.set(`p:${p.id}:${k}`, antigo); store.del(k); }
+      }
+    }
+    perfis.push(p);
+    store.set('perfis', perfis);
+  }
+  perfilId = p.id;
+  store.set('perfilAtual', perfilId);
+  carregarPerfil();
+  view = { tela: 'home' };
+  if (sessao && treino(sessao.treinoId) && contagem(treino(sessao.treinoId)).ok > 0) view = { tela: 'treino', id: sessao.treinoId };
+  render();
+  window.scrollTo({ top: 0 });
+}
+function sair() {
+  perfilId = null; store.del('perfilAtual');
+  fimDescanso = 0; clearInterval(tick); telaLigada(false);
+  view = { tela: 'home' };
+  render();
+}
 let view = { tela: 'home' };
 let pendente = null;                      // plano lido do PDF esperando confirmação
 let erroImport = '';
@@ -404,7 +454,30 @@ function contagem(t) {
 }
 
 // ---------- telas ----------
+function renderLogin() {
+  $dock.hidden = true;
+  $app.innerHTML = `
+    <header class="plano">
+      <div class="eyebrow">${plano ? `Rotina ${esc(plano.rotina)} · ${plano.treinos.length} treinos` : 'Ficha de treino'}</div>
+      <h1>Quem vai treinar?</h1>
+    </header>
+    ${perfis.length ? `<section class="treinos" aria-label="Perfis">
+      ${perfis.map((p) => `<button class="treino-card perfil" data-a="entrar" data-id="${p.id}">
+        <span class="letra" aria-hidden="true">${esc(p.nome.charAt(0).toUpperCase())}</span>
+        <span class="nome">${esc(p.nome)}</span>
+        ${ICON.chev}
+      </button>`).join('')}
+    </section>` : ''}
+    <form class="painel" id="form-perfil" novalidate>
+      <label class="eyebrow" for="nome-perfil">${perfis.length ? 'Primeira vez aqui?' : 'Seu nome'}</label>
+      <input class="campo" id="nome-perfil" maxlength="30" autocomplete="given-name" autocapitalize="words" placeholder="Como você quer ser chamado" required>
+      <button class="btn primary" type="submit">Entrar</button>
+      <p class="muted">Seu histórico e suas cargas ficam salvos neste aparelho, separados de quem mais usar o app nele.</p>
+    </form>`;
+}
+
 function render() {
+  if (!perfil()) return renderLogin();
   if (view.tela === 'treino' && treino(view.id)) return renderTreino(treino(view.id));
   if (view.tela === 'historico') return renderHistorico();
   view = { tela: 'home' };
@@ -416,7 +489,7 @@ function painelImport() {
     const n = pendente.treinos.reduce((a, t) => a + t.exercicios.length, 0);
     return `<section class="painel aviso">
       <div class="eyebrow">${pendente.origem === 'repo' ? 'Ficha nova disponível' : 'PDF lido'}</div>
-      <p><b>${esc(pendente.aluno)}</b> · Rotina ${esc(pendente.rotina)} · ${pendente.treinos.length} treinos, ${n} exercícios</p>
+      <p>Rotina ${esc(pendente.rotina)} · ${pendente.treinos.length} treinos, ${n} exercícios</p>
       <ul class="preview-list">${pendente.treinos.map((t) => `<li>Treino ${t.id} (${esc(t.titulo)}): ${t.exercicios.length} exercícios</li>`).join('')}</ul>
       <p class="muted">Isso substitui a ficha atual. O histórico e as cargas que você já registrou continuam.</p>
       <div class="row"><button class="btn primary" data-a="confirmar-import">Usar esta ficha</button><button class="btn ghost" data-a="cancelar-import">Cancelar</button></div>
@@ -442,8 +515,8 @@ function renderHome() {
   const emAndamento = sessao && treino(sessao.treinoId) && contagem(treino(sessao.treinoId)).ok > 0 ? sessao.treinoId : null;
   $app.innerHTML = `
     <header class="plano">
-      <div class="eyebrow">Rotina ${esc(plano.rotina)}</div>
-      <h1>${esc(plano.aluno || 'Minha ficha')}</h1>
+      <div class="spread"><span class="eyebrow">Rotina ${esc(plano.rotina)}</span><button class="btn small ghost" data-a="sair">Trocar perfil</button></div>
+      <h1>${esc(perfil().nome)}</h1>
       <div class="meta"><span>${esc(plano.objetivo)}</span><span>${esc(plano.nivel)}</span><span>${plano.treinos.length} treinos</span></div>
     </header>
     ${painelImport()}
@@ -504,7 +577,7 @@ function renderTreino(t) {
   const conflito = sessao && sessao.treinoId !== t.id && treino(sessao.treinoId) && contagem(treino(sessao.treinoId)).ok > 0;
   if (!conflito && (!sessao || sessao.treinoId !== t.id)) {
     sessao = { treinoId: t.id, inicio: new Date().toISOString(), feitos: {}, cargas: {} };
-    store.set('sessao', sessao);
+    store.set(pk('sessao'), sessao);
   }
   const { total, ok } = conflito ? { total: 0, ok: 0 } : contagem(t);
 
@@ -612,7 +685,7 @@ function renderHistorico() {
 }
 
 // ---------- ações ----------
-function salvarSessao() { store.set('sessao', sessao); }
+function salvarSessao() { store.set(pk('sessao'), sessao); }
 
 function finalizar() {
   const t = treino(sessao.treinoId);
@@ -628,8 +701,8 @@ function finalizar() {
     if (usadas.some(Boolean)) ultimas[chaveEx(ex)] = usadas;
   }
   historico.unshift(entrada);
-  store.set('historico', historico); store.set('ultimas', ultimas);
-  sessao = null; store.del('sessao');
+  store.set(pk('historico'), historico); store.set(pk('ultimas'), ultimas);
+  sessao = null; store.del(pk('sessao'));
   fimDescanso = 0; clearInterval(tick); telaLigada(false);
   view = { tela: 'home' };
   render();
@@ -654,10 +727,12 @@ $app.addEventListener('click', async (ev) => {
   const b = ev.target.closest('[data-a]');
   if (!b) return;
   const a = b.dataset.a;
-  if (a === 'carregar') document.getElementById('arquivo-pdf').click();
+  if (a === 'entrar') entrar(perfis.find((p) => p.id === b.dataset.id)?.nome || '');
+  else if (a === 'sair') sair();
+  else if (a === 'carregar') document.getElementById('arquivo-pdf').click();
   else if (a === 'confirmar-import') {
     plano = pendente; pendente = null; store.set('plano', plano);
-    if (sessao && !treino(sessao.treinoId)) { sessao = null; store.del('sessao'); }
+    if (sessao && !treino(sessao.treinoId)) { sessao = null; store.del(pk('sessao')); }
     render(); toast('Ficha atualizada');
   } else if (a === 'cancelar-import') {
     if (pendente?.origem === 'repo') store.set('repoIgnorado', pendente.importadoEm);
@@ -697,9 +772,17 @@ $app.addEventListener('click', async (ev) => {
   } else if (a === 'cancelar-fim') { view.confirmaFim = false; render(); }
   else if (a === 'descartar') {
     if (!b.dataset.sure) { b.dataset.sure = '1'; b.textContent = 'Toque de novo para descartar'; return; }
-    sessao = null; store.del('sessao'); fimDescanso = 0; clearInterval(tick);
+    sessao = null; store.del(pk('sessao')); fimDescanso = 0; clearInterval(tick);
     view = { tela: 'treino', id: b.dataset.id }; render(); toast('Séries descartadas');
   }
+});
+
+$app.addEventListener('submit', (ev) => {
+  if (ev.target.id !== 'form-perfil') return;
+  ev.preventDefault();
+  const inp = document.getElementById('nome-perfil');
+  if (!inp.value.trim()) { inp.focus(); toast('Digite seu nome para entrar'); return; }
+  entrar(inp.value);
 });
 
 $app.addEventListener('input', (ev) => {
@@ -721,7 +804,7 @@ $dock.addEventListener('click', (ev) => {
   else if (a === 'desc-tempo') {
     const op = [60, 90, 120, 180];
     descansoSeg = op[(op.indexOf(descansoSeg) + 1) % op.length];
-    store.set('descanso', descansoSeg); renderDock();
+    store.set(pk('descanso'), descansoSeg); renderDock();
   }
 });
 
@@ -743,7 +826,7 @@ async function iniciar() {
       else if (plano.origem === 'repo' && doRepo.importadoEm !== plano.importadoEm && store.get('repoIgnorado') !== doRepo.importadoEm) pendente = doRepo;
     }
   } catch {}
-  if (sessao && treino(sessao.treinoId) && contagem(treino(sessao.treinoId)).ok > 0) view = { tela: 'treino', id: sessao.treinoId };
+  if (perfil() && sessao && treino(sessao.treinoId) && contagem(treino(sessao.treinoId)).ok > 0) view = { tela: 'treino', id: sessao.treinoId };
   render();
 }
 iniciar();
