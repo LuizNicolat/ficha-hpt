@@ -335,8 +335,13 @@ async function entrar(nome, pin, lembrar, criar) {
     login = { ...login, carregando: false, erro: 'Sem conexão. Para entrar a primeira vez neste aparelho você precisa de internet.' };
     return render();
   }
-  if (r.status === 404) { login = { etapa: 'criar', nome, pin, lembrar, erro: '', carregando: false }; return render(); }
-  if (r.status !== 200) { login = { ...login, etapa: 'form', carregando: false, erro: r.mensagem || 'Não consegui entrar.' }; return render(); }
+  if (r.erro === 'nao-existe') { login = { etapa: 'criar', nome, pin, lembrar, erro: '', carregando: false }; return render(); }
+  if (r.status !== 200 || !r.token) {
+    // Sem "erro" no corpo, quem respondeu não foi a API (deploy sem a pasta functions/ ou ainda publicando).
+    const msg = r.erro ? r.mensagem : `O servidor do app não respondeu (código ${r.status}). A API ainda não está publicada; confira o deploy no Cloudflare.`;
+    login = { ...login, etapa: 'form', carregando: false, erro: msg || 'Não consegui entrar.' };
+    return render();
+  }
 
   auth = { token: r.token, nome: r.nome, slug: r.slug };
   gravarAuth(auth, lembrar);
