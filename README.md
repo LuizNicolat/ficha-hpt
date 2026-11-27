@@ -8,8 +8,9 @@ App de treino (PWA) que lê o PDF exportado do MFIT e monta a ficha: treinos A�
 - **Aparelho travado**: o primeiro usuário que entra num aparelho fica dono dele; ali só ele entra. "Conta → Liberar este aparelho" desfaz.
 - **Dados de cada um**: cargas usadas, anotações por exercício, histórico e treino em andamento. Ficam no Cloudflare KV, um JSON por pessoa.
 - **Offline**: sem internet, tudo é salvo no aparelho e enviado quando a conexão volta. Se dois aparelhos mudarem ao mesmo tempo, o histórico dos dois é somado.
-- **Carregar treino**: a pessoa pode trocar a ficha dela pelo PDF dela. A ficha base continua igual para os outros.
-- **Ficha base nova**: quando `docs/treino.json` muda, quem segue a ficha base recebe um aviso e escolhe se atualiza.
+- **Carregar treino**: o PDF novo vira a ficha de **todos** os usuários (fica em `cfg:ficha` no KV e é gravado no JSON de cada um). Histórico, cargas e anotações de cada pessoa continuam.
+- **Fichas anteriores**: antes de trocar, a ficha que estava valendo é guardada no histórico (`fh:<data>` no KV). Em "Conta → Fichas anteriores" dá pra baixar cada uma em JSON ou TXT.
+- **Ficha base**: enquanto ninguém carregou um PDF pelo app, a ficha de todos é o `docs/treino.json`. O Admin ainda pode mandar um PDF só para uma pessoa.
 - **Cadastro**: no Admin dá pra criar usuários (nome + PIN), já com a ficha base, e fechar o cadastro pela tela de login para que só o admin crie contas.
 - **Admin**: login separado, usuário `admin` + senha (secret `ADMIN_SENHA` no Cloudflare). Entra digitando "admin" no nome, pelo link "Entrar como admin" ou abrindo `/#admin`. Não usa a conta de treino nem trava o aparelho. Lá dá pra ver cada usuário (último treino, histórico, anotações), enviar a ficha base ou um PDF para alguém, definir novo PIN, desbloquear, desconectar dos aparelhos e excluir.
 - **Vídeos**: cada exercício tem "Ver execução", que mostra um vídeo do YouTube dentro do app. A busca usa a YouTube Data API (secret `YOUTUBE_API_KEY`), primeiro nos canais escolhidos no Admin e, se não achar, no YouTube todo, e roda uma vez por exercício: o resultado fica no KV para todos. No Admin → Vídeos dá pra fixar o vídeo certo de um exercício ou mandar buscar de novo.
