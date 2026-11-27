@@ -5,6 +5,12 @@
 // PUT  /api/dados    { rev, dados }                   -> { rev }  (409 + versão do servidor se rev estiver velho)
 // POST /api/sair
 //
+// Ficha compartilhada (vale para todos os usuários):
+// GET  /api/ficha                 -> { ficha }  (cfg:ficha ou, se ainda não tiver, docs/treino.json)
+// PUT  /api/ficha    { ficha }    troca a ficha de todo mundo; a anterior vai para o histórico de fichas
+// GET  /api/fichas                -> { fichas: [{ id, arquivadoEm, rotina, importadoEm, treinos, trocadaPor }] }
+// GET  /api/fichas/<id>           -> { ficha, arquivadoEm, trocadaPor }  (JSON completo da ficha antiga)
+//
 // Admin: login próprio (usuário "admin" + senha do secret ADMIN_SENHA no Cloudflare):
 // POST   /api/admin/entrar                   { senha, lembrar } -> { token }
 // GET    /api/admin/usuarios                 lista com resumo (+ cadastroAberto)
@@ -31,6 +37,8 @@
 //   t:<slug>   <n>                                     tentativas de PIN erradas (expira em 15 min)
 //   cfg:canais [{ id, nome, handle }]                  canais do YouTube usados na busca
 //   cfg:cadastro  "fechado"                         só o admin cria contas (sem a chave: aberto)
+//   cfg:ficha  { ficha, em, por }                      ficha compartilhada atual
+//   fh:<data>  { ficha, arquivadoEm, trocadaPor }      fichas anteriores (histórico)
 //   v:<nome>   { nome, videos, fixo, buscadoEm }       vídeos de cada exercício
 
 const MAX_TENTATIVAS = 5;
@@ -152,6 +160,8 @@ async function api(request, env, rota, url) {
 
   if (rota === 'video' && metodo === 'GET') return videoDoExercicio(kv, env, url.searchParams.get('nome'));
 
+  if (rota === 'ficha' || rota.startsWith('fichas')) return fichaCompartilhada(request, kv, env, rota, slug);
+
   if (slug === ADMIN && rota !== 'sair' && !rota.startsWith('admin/')) return json({ erro: 'proibido', mensagem: 'A conta admin não tem treinos.' }, 403);
 
   if (rota === 'dados' && metodo === 'GET') {
@@ -182,6 +192,78 @@ async function api(request, env, rota, url) {
     const rv = rota.slice(6);
     if (['videos', 'canais', 'video'].includes(rv)) return adminVideos(request, kv, env, rv, url);
     return admin(request, kv, rv, slug);
+  }
+
+  return json({ erro: 'rota' }, 404);
+}
+
+// ---------- ficha compartilhada ----------
+// A ficha que vale para todo mundo fica em cfg:ficha. Antes do primeiro "Carregar treino" ela é o docs/treino.json.
+// Quando alguém carrega um PDF novo, a ficha anterior vai para fh:<data> (o histórico de fichas)
+// e a nova é gravada no JSON de cada usuário.
+async function fichaAtual(kv, env, request) {
+  const salva = await kv.get('cfg:ficha', 'json');
+  if (salva?.ficha) return salva.ficha;
+  try {
+    const r = await env.ASSETS.fetch(new Request(new URL('/treino.json', request.url)));
+    if (r.ok) return { ...(await r.json()), origem: 'repo' };
+  } catch {}
+  return null;
+}
+
+async function nomeDe(kv, slug) {
+  if (slug === ADMIN) return 'admin';
+  return (await kv.get(`u:${slug}`, 'json'))?.nome || slug;
+}
+
+async function fichaCompartilhada(request, kv, env, rota, slug) {
+  const metodo = request.method;
+
+  if (rota === 'ficha' && metodo === 'GET') return json({ ficha: await fichaAtual(kv, env, request) });
+
+  if (rota === 'ficha' && metodo === 'PUT') {
+    const texto = await request.text();
+    if (texto.length > 1_000_000) return json({ erro: 'grande', mensagem: 'Ficha grande demais.' }, 413);
+    let corpo;
+    try { corpo = JSON.parse(texto); } catch { return json({ erro: 'json' }, 400); }
+    if (!corpo?.ficha?.treinos?.length) return json({ erro: 'ficha', mensagem: 'Ficha inválida.' }, 400);
+    const agora = new Date().toISOString();
+    const por = await nomeDe(kv, slug);
+    const nova = { ...corpo.ficha, origem: 'repo' };
+
+    // 1) guarda a ficha que estava valendo no histórico
+    const anterior = await fichaAtual(kv, env, request);
+    if (anterior && anterior.importadoEm !== nova.importadoEm)
+      await kv.put(`fh:${agora}`, JSON.stringify({ ficha: anterior, arquivadoEm: agora, trocadaPor: por }),
+        { metadata: { rotina: anterior.rotina, importadoEm: anterior.importadoEm, treinos: anterior.treinos?.length || 0, trocadaPor: por } });
+
+    // 2) a nova passa a ser a de todos
+    await kv.put('cfg:ficha', JSON.stringify({ ficha: nova, em: agora, por }));
+    const usuarios = await listarChaves(kv, 'u:');
+    const fichaEm = Date.now();
+    await Promise.all(usuarios.map(async ({ name }) => {
+      const s = name.slice(2);
+      const d = (await kv.get(`d:${s}`, 'json')) || { rev: 0, dados: null };
+      const dados = { ...(d.dados || {}), ficha: nova, fichaEm };
+      if (dados.sessao && !nova.treinos.some((t) => t.id === dados.sessao.treinoId)) { dados.sessao = null; dados.sessaoEm = fichaEm; }
+      await kv.put(`d:${s}`, JSON.stringify({ rev: d.rev + 1, dados, atualizadoEm: agora }));
+    }));
+    return json({ ok: true, usuarios: usuarios.length, ficha: nova });
+  }
+
+  if (rota === 'fichas' && metodo === 'GET') {
+    const chaves = await listarChaves(kv, 'fh:');
+    const fichas = chaves.map((k) => ({ id: k.name.slice(3), arquivadoEm: k.name.slice(3), ...(k.metadata || {}) }))
+      .sort((a, b) => b.id.localeCompare(a.id));
+    return json({ fichas });
+  }
+
+  let m = null;
+  try { m = decodeURIComponent(rota).match(/^fichas\/([0-9TZ:.\-]+)$/); } catch {}
+  if (m && metodo === 'GET') {
+    const reg = await kv.get(`fh:${m[1]}`, 'json');
+    if (!reg) return json({ erro: 'nao-existe', mensagem: 'Essa ficha não está mais no histórico.' }, 404);
+    return json(reg);
   }
 
   return json({ erro: 'rota' }, 404);

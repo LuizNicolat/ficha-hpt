@@ -725,13 +725,21 @@ async function puxar() {
   }
 }
 
-// Ficha base do repositório (docs/treino.json): quem ainda não tem ficha recebe uma cópia,
-// e quem segue a do repo é avisado quando ela muda.
+// Ficha compartilhada (a de todo mundo): vem da API e, se ela não responder, do docs/treino.json.
+async function buscarFichaBase(comoAdmin) {
+  try {
+    const r = await api('ficha', { admin: comoAdmin });
+    if (r.status === 200 && r.ficha) return r.ficha;
+  } catch (e) { if (e.message === 'sessao') throw e; }
+  const r = await fetch('treino.json', { cache: 'no-store' });
+  if (!r.ok) throw new Error('sem ficha');
+  return { ...(await r.json()), origem: 'repo' };
+}
+
+// Quem ainda não tem ficha recebe uma cópia da compartilhada, e quem segue ela é avisado quando muda.
 async function fichaBase() {
   try {
-    const r = await fetch('treino.json', { cache: 'no-store' });
-    if (!r.ok) return;
-    const base = { ...(await r.json()), origem: 'repo' };
+    const base = await buscarFichaBase();
     if (!plano) { plano = base; salvar({ ficha: true }); render(); }
     else if (plano.origem === 'repo' && base.importadoEm !== plano.importadoEm && repoIgnorado !== base.importadoEm && !pendente) { pendente = base; if (view.tela === 'home') render(); }
   } catch {}
@@ -806,6 +814,7 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 const norm = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
 const dataBR = (iso) => new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
 const diaBR = (iso) => new Date(iso).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' });
+const dataBR = (iso) => (iso ? new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '?');
 const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.max(0, s) % 60).padStart(2, '0')}`;
 const novoId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
@@ -985,8 +994,8 @@ function painelImport() {
       <div class="eyebrow">${pendente.origem === 'repo' ? 'Ficha nova disponível' : 'PDF lido'}</div>
       <p>Rotina ${esc(pendente.rotina)} · ${pendente.treinos.length} treinos, ${n} exercícios</p>
       <ul class="preview-list">${pendente.treinos.map((t) => `<li>Treino ${t.id} (${esc(t.titulo)}): ${t.exercicios.length} exercícios</li>`).join('')}</ul>
-      <p class="muted">Isso substitui a sua ficha. Seu histórico, suas cargas e suas anotações continuam.</p>
-      <div class="row"><button class="btn primary" data-a="confirmar-import">Usar esta ficha</button><button class="btn ghost" data-a="cancelar-import">${pendente.origem === 'repo' ? 'Manter a minha' : 'Cancelar'}</button></div>
+      <p class="muted">${pendente.origem === 'repo' ? 'Isso substitui a sua ficha.' : 'Isso troca a ficha de todo mundo. A ficha atual fica guardada em "Conta → Fichas anteriores".'} Histórico, cargas e anotações continuam.</p>
+      <div class="row"><button class="btn primary" data-a="confirmar-import">${pendente.origem === 'repo' ? 'Usar esta ficha' : 'Usar para todos'}</button><button class="btn ghost" data-a="cancelar-import">${pendente.origem === 'repo' ? 'Manter a minha' : 'Cancelar'}</button></div>
     </section>`;
   }
   if (erroImport) return `<section class="painel erro"><p>${esc(erroImport)}</p></section>`;
@@ -1412,8 +1421,65 @@ function renderEvolucao() {
 }
 
 // ---------- conta ----------
+// Fichas anteriores (histórico das fichas compartilhadas)
+let fichasAnt = { lista: null, erro: '', carregando: false };
+async function carregarFichasAnt() {
+  if (fichasAnt.carregando) return;
+  fichasAnt = { ...fichasAnt, carregando: true, erro: '' };
+  try {
+    const r = await api('fichas');
+    if (r.status !== 200) throw new Error(r.mensagem || 'Não consegui carregar as fichas anteriores.');
+    fichasAnt = { lista: r.fichas, erro: '', carregando: false };
+  } catch (e) {
+    if (e.message === 'sessao') return;
+    fichasAnt = { lista: null, erro: navigator.onLine ? (e.message || 'Não consegui carregar.') : 'Sem conexão: as fichas anteriores aparecem quando a internet voltar.', carregando: false };
+  }
+  if (view.tela === 'conta') render();
+}
+
+// Versão em texto da ficha, para ler/imprimir
+function fichaTxt(f) {
+  const l = [`Rotina ${f.rotina || ''}${f.objetivo ? ` · ${f.objetivo}` : ''}${f.nivel ? ` · ${f.nivel}` : ''}`, `Importada em ${dataBR(f.importadoEm)}`, ''];
+  for (const t of f.treinos || []) {
+    l.push(`=== Treino ${t.id} (${t.titulo || ''}) ===`);
+    for (const e of t.exercicios || []) {
+      l.push(`- ${e.nome}${e.grupo ? ' [combinado]' : ''}`);
+      if (e.series) l.push(`    Séries: ${e.series}`);
+      if (e.carga) l.push(`    Carga: ${e.carga}`);
+      if (e.instrucoes) l.push(`    Instruções: ${e.instrucoes}`);
+    }
+    l.push('');
+  }
+  return l.join('\n');
+}
+
+function baixarArquivo(nome, conteudo, tipo) {
+  const url = URL.createObjectURL(new Blob([conteudo], { type: tipo }));
+  const a = Object.assign(document.createElement('a'), { href: url, download: nome });
+  a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// Troca a ficha de todo mundo (a atual vai para o histórico no servidor)
+async function fichaParaTodos(ficha) {
+  try {
+    const r = await api('ficha', { method: 'PUT', body: JSON.stringify({ ficha }) });
+    if (r.status !== 200) throw new Error(r.mensagem || 'Não consegui enviar a ficha.');
+    plano = r.ficha;
+    if (sessao && !treino(sessao.treinoId)) sessao = null;
+    salvar({ ficha: true, sessao: true });
+    fichasAnt = { lista: null, erro: '', carregando: false };
+    render();
+    toast(`Ficha atualizada para todos (${r.usuarios} ${r.usuarios === 1 ? 'pessoa' : 'pessoas'})`);
+  } catch (e) {
+    if (e.message === 'sessao') return;
+    render();
+    toast(navigator.onLine ? (e.message || 'Não deu certo.') : 'Sem conexão: a ficha mudou só pra você. Em Conta, toque em "Usar esta ficha para todos" quando a internet voltar.');
+  }
+}
+
 function renderConta() {
   $dock.hidden = true;
+  if (!fichasAnt.lista && !fichasAnt.erro) carregarFichasAnt();
   const opc = (v, rot) => `<button class="seg-op" data-a="tema" data-v="${v}" aria-pressed="${tema === v}">${rot}</button>`;
   $app.innerHTML = `
     <header class="cabeca">
@@ -1428,12 +1494,26 @@ function renderConta() {
     ${painelImport()}
     <section class="painel">
       <div class="eyebrow">Minha ficha</div>
-      ${plano ? `<p>${plano.origem === 'repo' ? 'Ficha base' : 'Ficha do seu PDF'} · Rotina ${esc(plano.rotina)} · ${plano.treinos.length} treinos · desde ${diaBR(plano.importadoEm)}</p>` : '<p>Nenhuma ficha carregada.</p>'}
-      <div class="row"><button class="btn small" data-a="carregar">${ICON.upload} Carregar treino (PDF)</button></div>
+      ${plano ? `<p>${plano.origem === 'repo' ? 'Ficha de todos' : 'Ficha só sua (PDF)'} · Rotina ${esc(plano.rotina)} · ${plano.treinos.length} treinos · desde ${diaBR(plano.importadoEm)}</p>` : '<p>Nenhuma ficha carregada.</p>'}
+      <div class="row">
+        <button class="btn small" data-a="carregar">${ICON.upload} Carregar treino (PDF)</button>
+        ${plano && plano.origem !== 'repo' ? `<button class="btn small primary" data-a="ficha-todos">Usar esta ficha para todos</button>` : ''}
+      </div>
+      <p class="muted pequeno">Um PDF novo troca a ficha de todo mundo; a anterior fica em "Fichas anteriores".</p>
       ${plano ? `<details class="json-box"><summary class="eyebrow">Ficha em JSON</summary>
         <textarea class="json" id="json-ficha" readonly>${esc(JSON.stringify(plano, null, 2))}</textarea>
         <div class="row"><button class="btn small" data-a="copiar-json">Copiar JSON</button><button class="btn small" data-a="baixar-json">Baixar treino.json</button></div>
       </details>` : ''}
+    </section>
+    <section class="painel">
+      <div class="eyebrow">Fichas anteriores</div>
+      ${fichasAnt.erro ? `<p class="muted">${esc(fichasAnt.erro)}</p>`
+        : !fichasAnt.lista ? '<p class="muted">Carregando…</p>'
+        : !fichasAnt.lista.length ? '<p class="muted">Nenhuma ainda. Quando alguém carregar um treino novo, a ficha que estava valendo aparece aqui.</p>'
+        : `<ul class="preview-list">${fichasAnt.lista.map((f) => `<li>
+            <div>Rotina ${esc(f.rotina || '?')} · ${f.treinos || '?'} treinos · de ${dataBR(f.importadoEm)} até ${dataBR(f.arquivadoEm)}${f.trocadaPor ? ` <span class="muted">(trocada por ${esc(f.trocadaPor)})</span>` : ''}</div>
+            <div class="row"><button class="btn small" data-a="ficha-ant-baixar" data-id="${esc(f.id)}">Baixar JSON</button><button class="btn small" data-a="ficha-ant-txt" data-id="${esc(f.id)}">Baixar TXT</button></div>
+          </li>`).join('')}</ul>`}
     </section>
     <section class="painel">
       <div class="eyebrow">Este aparelho</div>
@@ -1678,7 +1758,7 @@ function renderAdminUsuario() {
       ${ficha ? `<p>${ficha.origem === 'repo' ? 'Ficha base' : 'Ficha própria (PDF)'} · Rotina ${esc(ficha.rotina)} · ${ficha.treinos.length} treinos · desde ${diaBR(ficha.importadoEm)}</p>
         <p class="muted">${ficha.treinos.map((t) => `${t.id} ${esc(t.titulo)}`).join(' · ')}</p>` : '<p>Ainda não tem ficha.</p>'}
       <div class="row">
-        <button class="btn small" data-a="adm-ficha-base" data-slug="${esc(u.slug)}">Enviar ficha base</button>
+        <button class="btn small" data-a="adm-ficha-base" data-slug="${esc(u.slug)}">Enviar ficha de todos</button>
         <button class="btn small" data-a="adm-ficha-pdf" data-slug="${esc(u.slug)}">${ICON.upload} Carregar PDF pra ${esc(u.nome.split(' ')[0])}</button>
       </div>
       <p class="muted">A ficha nova aparece no app da pessoa na próxima vez que ela abrir. Cargas, anotações e histórico continuam.</p>
@@ -1734,7 +1814,7 @@ async function admCarregarVideos() {
   try {
     const [r, base] = await Promise.all([
       api('admin/videos', { admin: true }),
-      fetch('treino.json', { cache: 'no-store' }).then((x) => (x.ok ? x.json() : null)).catch(() => null),
+      buscarFichaBase(true).catch(() => null),
     ]);
     if (r.status !== 200) throw new Error(r.mensagem || 'Não consegui carregar os vídeos.');
     admVid.dados = r; admVid.base = base;
@@ -1870,10 +1950,8 @@ $app.addEventListener('click', async (ev) => {
   else if (a === 'adm-ficha-base') {
     if (!b.dataset.sure) { b.dataset.sure = '1'; b.textContent = 'Toque de novo para enviar'; return; }
     try {
-      const r = await fetch('treino.json', { cache: 'no-store' });
-      if (!r.ok) throw new Error();
-      admEnviarFicha(b.dataset.slug, { ...(await r.json()), origem: 'repo' }, 'base');
-    } catch { toast('Não consegui ler a ficha base (treino.json).'); }
+      admEnviarFicha(b.dataset.slug, await buscarFichaBase(true), 'de todos');
+    } catch (e) { if (e.message !== 'sessao') toast('Não consegui ler a ficha de todos.'); }
   }
   else if (a === 'adm-ficha-pdf') { adm.pdfPara = b.dataset.slug; document.getElementById('arquivo-pdf').click(); }
   else if (a === 'adm-desbloquear') { if (await admAcao(b.dataset.slug, 'desbloquear', 'POST', null, 'Desbloqueado')) admCarregarUsuario(b.dataset.slug); }
@@ -1887,10 +1965,26 @@ $app.addEventListener('click', async (ev) => {
   }
   else if (a === 'carregar') { adm.pdfPara = null; document.getElementById('arquivo-pdf').click(); }
   else if (a === 'confirmar-import') {
-    plano = pendente; pendente = null;
+    const nova = pendente; pendente = null;
+    plano = nova;
     if (sessao && !treino(sessao.treinoId)) sessao = null;
     salvar({ ficha: true, sessao: true });
-    render(); toast('Ficha atualizada');
+    render();
+    if (nova.origem === 'repo') toast('Ficha atualizada');
+    else { toast('Enviando a ficha para todos…'); fichaParaTodos(nova); }
+  }
+  else if (a === 'ficha-todos') {
+    if (!b.dataset.sure) { b.dataset.sure = '1'; b.textContent = 'Toque de novo: troca a ficha de todos'; return; }
+    fichaParaTodos(plano);
+  }
+  else if (a === 'ficha-ant-baixar' || a === 'ficha-ant-txt') {
+    try {
+      const r = await api(`fichas/${encodeURIComponent(b.dataset.id)}`);
+      if (r.status !== 200) throw new Error(r.mensagem || 'Não consegui baixar.');
+      const nome = `ficha-${String(r.ficha.importadoEm || b.dataset.id).slice(0, 10)}`;
+      if (a === 'ficha-ant-baixar') baixarArquivo(`${nome}.json`, JSON.stringify(r.ficha, null, 2), 'application/json');
+      else baixarArquivo(`${nome}.txt`, fichaTxt(r.ficha), 'text/plain;charset=utf-8');
+    } catch (e) { if (e.message !== 'sessao') toast(e.message || 'Não consegui baixar.'); }
   } else if (a === 'cancelar-import') {
     if (pendente?.origem === 'repo') { repoIgnorado = pendente.importadoEm; salvar(); }
     pendente = null; erroImport = ''; render();
@@ -1989,7 +2083,7 @@ $app.addEventListener('submit', (ev) => {
     adm.criando = true; render();
     (async () => {
       let ficha = null;
-      try { const r = await fetch('treino.json', { cache: 'no-store' }); if (r.ok) ficha = { ...(await r.json()), origem: 'repo' }; } catch {}
+      try { ficha = await buscarFichaBase(true); } catch {}
       const r = await api('admin/usuarios', { method: 'POST', body: JSON.stringify({ nome, pin, ficha }), admin: true });
       adm.criando = false;
       if (r.status !== 200) { render(); toast(r.mensagem || 'Não consegui criar.'); document.getElementById('novo-nome').value = nome; document.getElementById('novo-pin').value = pin; return; }
