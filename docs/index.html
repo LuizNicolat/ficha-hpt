@@ -814,7 +814,7 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 const norm = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
 const dataBR = (iso) => new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
 const diaBR = (iso) => new Date(iso).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' });
-const dataBR = (iso) => (iso ? new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '?');
+const dataAnoBR = (iso) => (iso ? new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '?');
 const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.max(0, s) % 60).padStart(2, '0')}`;
 const novoId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
@@ -1439,7 +1439,7 @@ async function carregarFichasAnt() {
 
 // Versão em texto da ficha, para ler/imprimir
 function fichaTxt(f) {
-  const l = [`Rotina ${f.rotina || ''}${f.objetivo ? ` · ${f.objetivo}` : ''}${f.nivel ? ` · ${f.nivel}` : ''}`, `Importada em ${dataBR(f.importadoEm)}`, ''];
+  const l = [`Rotina ${f.rotina || ''}${f.objetivo ? ` · ${f.objetivo}` : ''}${f.nivel ? ` · ${f.nivel}` : ''}`, `Importada em ${dataAnoBR(f.importadoEm)}`, ''];
   for (const t of f.treinos || []) {
     l.push(`=== Treino ${t.id} (${t.titulo || ''}) ===`);
     for (const e of t.exercicios || []) {
@@ -1511,7 +1511,7 @@ function renderConta() {
         : !fichasAnt.lista ? '<p class="muted">Carregando…</p>'
         : !fichasAnt.lista.length ? '<p class="muted">Nenhuma ainda. Quando alguém carregar um treino novo, a ficha que estava valendo aparece aqui.</p>'
         : `<ul class="preview-list">${fichasAnt.lista.map((f) => `<li>
-            <div>Rotina ${esc(f.rotina || '?')} · ${f.treinos || '?'} treinos · de ${dataBR(f.importadoEm)} até ${dataBR(f.arquivadoEm)}${f.trocadaPor ? ` <span class="muted">(trocada por ${esc(f.trocadaPor)})</span>` : ''}</div>
+            <div>Rotina ${esc(f.rotina || '?')} · ${f.treinos || '?'} treinos · de ${dataAnoBR(f.importadoEm)} até ${dataAnoBR(f.arquivadoEm)}${f.trocadaPor ? ` <span class="muted">(trocada por ${esc(f.trocadaPor)})</span>` : ''}</div>
             <div class="row"><button class="btn small" data-a="ficha-ant-baixar" data-id="${esc(f.id)}">Baixar JSON</button><button class="btn small" data-a="ficha-ant-txt" data-id="${esc(f.id)}">Baixar TXT</button></div>
           </li>`).join('')}</ul>`}
     </section>
